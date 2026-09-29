@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Éditeur de créneaux SAS — Bundle agrégateur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F2F5F4; --panel:#FFFFFF; --ink:#16283A; --muted:#5A6B7A; --line:#D5DEDC;
+  --accent:#1F6F8B; --accent-soft:#E2EFF3; --warn:#9A6200; --warn-soft:#FFF3DC;
+  --err:#B3261E; --err-soft:#FCE8E6; --ok:#2F7A4D; --ok-soft:#E4F3EA; --code:#0F1E2C; --code-ink:#D6E6EE;
+  --sans:"Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0F1A22; --panel:#16242E; --ink:#E3ECEF; --muted:#94A7B3; --line:#2B3D49;
+    --accent:#5FB3CF; --accent-soft:#1B3441; --warn:#E6B45A; --warn-soft:#3A2E17;
+    --err:#F08A80; --err-soft:#3D1F1D; --ok:#7CC79A; --ok-soft:#18332A; --code:#0A131A; --code-ink:#C9DCE4;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0F1A22; --panel:#16242E; --ink:#E3ECEF; --muted:#94A7B3; --line:#2B3D49;
+  --accent:#5FB3CF; --accent-soft:#1B3441; --warn:#E6B45A; --warn-soft:#3A2E17;
+  --err:#F08A80; --err-soft:#3D1F1D; --ok:#7CC79A; --ok-soft:#18332A; --code:#0A131A; --code-ink:#C9DCE4;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+header.top{padding:28px clamp(16px,4vw,40px) 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+header.top .home{display:inline-block;margin-bottom:8px;color:var(--accent);text-decoration:none;font-size:.9rem}
+header.top .home:hover{text-decoration:underline}
+header.top h1{margin:0;font-size:1.55rem;letter-spacing:-.01em}
+header.top p{margin:6px 0 0;color:var(--muted);max-width:72ch}
+
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,440px);gap:24px;padding:24px clamp(16px,4vw,40px) 60px;align-items:start}
+@media (max-width:1000px){main{grid-template-columns:minmax(0,1fr)}}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.panel > h2{margin:0;padding:14px 18px;font-size:1.05rem;border-bottom:1px solid var(--line)}
+.panel .body{padding:16px 18px}
+
+/* Import */
+#importPanel textarea{width:100%;min-height:180px;resize:vertical;font-family:var(--mono);font-size:.8rem;background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:7px 12px;cursor:pointer;line-height:1.2}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .btn.primary{color:#07131A}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn.primary{color:#07131A}}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--err);border-color:var(--err-soft)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+label.file{position:relative;overflow:hidden}
+label.file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.msg{margin-top:10px;padding:8px 12px;border-radius:6px;font-size:.92rem}
+.msg.err{background:var(--err-soft);color:var(--err)}
+.msg.ok{background:var(--ok-soft);color:var(--ok)}
+.hidden{display:none!important}
+
+/* Toolbar */
+.toolbar{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:end;padding:14px 18px;margin:18px 0}
+.toolbar .field{display:flex;flex-direction:column;gap:4px;font-size:.88rem;color:var(--muted)}
+.toolbar select,.toolbar input{border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--panel)}
+.toolbar input[type=number]{width:5.5em}
+
+/* Practitioner */
+.pract{margin-bottom:22px;overflow:hidden}
+.pract-head{display:flex;flex-wrap:wrap;gap:6px 24px;align-items:baseline;padding:18px;border-bottom:1px solid var(--line);background:linear-gradient(90deg,var(--accent-soft),transparent 70%)}
+.pract-head .name{font-size:1.35rem;font-weight:700}
+.pract-head .name .family{text-transform:uppercase;letter-spacing:.02em}
+.idbox{display:flex;gap:18px;flex-wrap:wrap;font-size:.9rem;color:var(--muted)}
+.idbox b{color:var(--ink);font-family:var(--mono);font-weight:500}
+.ro{font-size:.75rem;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px;white-space:nowrap}
+
+.role{padding:16px 18px;border-top:1px dashed var(--line)}
+.role:first-of-type{border-top:none}
+.addr{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
+.addr svg{flex:none;margin-top:3px;color:var(--accent)}
+.addr .lines{font-weight:700}
+.addr .meta{font-size:.86rem;color:var(--muted);margin-top:2px}
+.sched-id{font-size:.8rem;color:var(--muted);margin:10px 0 6px}
+
+.tablewrap{overflow-x:auto}
+table.slots{width:100%;border-collapse:collapse;min-width:1080px}
+table.slots th{font-size:.8rem;color:var(--muted);font-weight:400;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+table.slots td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.slots input[type=date],table.slots input[type=time]{border:1px solid var(--line);border-radius:6px;padding:5px 7px;background:var(--paper)}
+table.slots select.sel{border:1px solid var(--line);border-radius:6px;padding:5px 7px;background:var(--paper);max-width:15rem}
+table.slots input.bad{border-color:var(--err);background:var(--err-soft)}
+table.slots .sid{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.dur{font-size:.85rem;color:var(--muted);white-space:nowrap}
+.tag{display:inline-block;font-size:.76rem;padding:1px 8px;border-radius:999px;margin-right:4px;white-space:nowrap}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.err{background:var(--err-soft);color:var(--err)}
+.tag.new{background:var(--accent-soft);color:var(--accent)}
+.empty{color:var(--muted);font-style:italic;padding:10px 8px}
+.addslot{margin-top:10px}
+
+.pract.editing{border-color:var(--accent)}
+.pract-head.edit{display:block;background:var(--accent-soft)}
+.pract-head.edit .row{margin-top:12px}
+.formgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px 14px;width:100%}
+.fld{display:flex;flex-direction:column;gap:3px;min-width:0}
+.fld.wide{grid-column:span 2}
+@media (max-width:560px){.fld.wide{grid-column:auto}}
+.fld label{font-size:.82rem;color:var(--muted)}
+.fld input{border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--panel);width:100%}
+.fld input.bad{border-color:var(--err);background:var(--err-soft)}
+.hint{font-size:.76rem;color:var(--muted);min-height:1em}
+.hint.errtxt{color:var(--err)}
+.addr .grow{flex:1;min-width:0}
+.addr-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex:none}
+a.btn.search{text-decoration:none;color:var(--accent);border-color:var(--accent);white-space:nowrap}
+a.btn.search:hover{background:var(--accent-soft)}
+a.btn.search.off{color:var(--muted);border-color:var(--line);cursor:not-allowed;background:transparent}
+.role.addrole{padding-top:10px;padding-bottom:14px}
+.empty-state{padding:24px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;color:var(--muted)}
+.orphans{padding:14px 18px;background:var(--warn-soft);color:var(--warn);border-radius:8px;margin-bottom:18px}
+
+/* Export */
+aside{position:sticky;top:calc(16px + env(safe-area-inset-top,0px))}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.stat{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.stat .n{font-size:1.3rem;font-weight:700}
+.stat .l{font-size:.78rem;color:var(--muted)}
+.checks{list-style:none;margin:0 0 12px;padding:0;font-size:.9rem}
+.checks li{padding:4px 0 4px 22px;position:relative}
+.checks li::before{content:"";position:absolute;left:4px;top:.72em;width:9px;height:9px;border-radius:50%}
+.checks li.ok::before{background:var(--ok)}
+.checks li.warn::before{background:var(--warn)}
+.checks li.err::before{background:var(--err)}
+pre#preview{margin:0;background:var(--code);color:var(--code-ink);font-family:var(--mono);font-size:.74rem;line-height:1.5;padding:12px;border-radius:8px;max-height:52vh;overflow:auto;white-space:pre}
+.opt{display:flex;gap:8px;align-items:center;font-size:.9rem;margin:10px 0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:8px;font-size:.92rem;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion: reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="home" href="index.html">← Accueil</a>
+  <h1>Éditeur de créneaux — Bundle agrégateur SAS</h1>
+  <p>Collez un Bundle <code>searchset</code> renvoyé par un éditeur (ou partez de zéro), ajustez professionnels, adresses et créneaux, puis exportez un Bundle complet.</p>
+</header>
+
+<main>
+  <section>
+    <div class="panel" id="importPanel">
+      <h2>Ressource source</h2>
+      <div class="body">
+        <textarea id="src" spellcheck="false" placeholder='{"resourceType":"Bundle","type":"searchset", …}' aria-label="JSON du Bundle FHIR"></textarea>
+        <div class="row" style="margin-top:10px">
+          <button class="btn primary" id="btnParse">Interpréter le JSON</button>
+          <label class="btn file">Ouvrir un fichier .json<input type="file" id="fileIn" accept=".json,application/json,application/fhir+json"></label>
+          <button class="btn" id="btnExample">Charger l'exemple</button>
+          <button class="btn" id="btnEmpty">Partir d'un Bundle vide</button>
+        </div>
+        <div id="importMsg"></div>
+      </div>
+    </div>
+
+    <div id="editor" class="hidden">
+      <div class="panel toolbar">
+        <div class="field">
+          <label for="tz">Fuseau horaire des créneaux</label>
+          <select id="tz">
+            <option value="Europe/Paris">Métropole (Europe/Paris)</option>
+            <option value="America/Guadeloupe">Guadeloupe</option>
+            <option value="America/Martinique">Martinique</option>
+            <option value="America/Cayenne">Guyane</option>
+            <option value="Indian/Reunion">La Réunion</option>
+            <option value="Indian/Mayotte">Mayotte</option>
+            <option value="America/Miquelon">Saint-Pierre-et-Miquelon</option>
+            <option value="Pacific/Noumea">Nouvelle-Calédonie</option>
+            <option value="Pacific/Tahiti">Polynésie (Tahiti)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="sasUrl">Page de recherche SAS</label>
+          <input type="url" id="sasUrl" value="https://sas.integration2.santefr.esante.gouv.fr/sas/recherche" style="width:26rem;max-width:80vw">
+        </div>
+        <div class="field">
+          <label for="defDur">Durée par défaut (min)</label>
+          <input type="number" id="defDur" min="5" step="5" value="20">
+        </div>
+        <div class="field">
+          <label for="shiftDays">Décaler tous les créneaux de</label>
+          <div class="row"><input type="number" id="shiftDays" value="7" step="1"> <span>jours</span> <button class="btn" id="btnShift">Décaler</button></div>
+        </div>
+        <div class="row">
+          <button class="btn primary" id="btnAddPract">＋ Ajouter un professionnel</button>
+          <button class="btn" id="btnRebase">Recaler à partir de demain</button>
+          <button class="btn" id="btnPurgePast">Supprimer les créneaux passés</button>
+          <button class="btn ghost" id="btnReimport">Changer de ressource</button>
+        </div>
+      </div>
+      <div id="orphans"></div>
+      <div id="practs"></div>
+    </div>
+  </section>
+
+  <aside id="exportPanel" class="panel hidden">
+    <h2>Export du Bundle</h2>
+    <div class="body">
+      <div class="stats">
+        <div class="stat"><div class="n" id="stP">0</div><div class="l">professionnels</div></div>
+        <div class="stat"><div class="n" id="stL">0</div><div class="l">lieux</div></div>
+        <div class="stat"><div class="n" id="stS">0</div><div class="l">créneaux</div></div>
+      </div>
+      <ul class="checks" id="checks"></ul>
+      <label class="opt"><input type="checkbox" id="optSort" checked> Trier les créneaux par date de début</label>
+      <label class="opt"><input type="checkbox" id="optNewId"> Générer un nouvel identifiant de Bundle</label>
+      <div class="row" style="margin:12px 0">
+        <button class="btn primary" id="btnCopy">Copier le JSON</button>
+        <button class="btn hidden" id="btnDownload">Télécharger le .json</button>
+      </div>
+      <pre id="preview" tabindex="0" aria-label="Aperçu du Bundle exporté"></pre>
+    </div>
+  </aside>
+</main>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- Exemple fourni ---------- */
+const EXAMPLE = {"id":"b3f1c2d4-7e8a-4b5c-9d0e-1f2a3b4c5d6e","resourceType":"Bundle","type":"searchset","total":6,"meta":{"profile":["http://sas.fr/fhir/StructureDefinition/BundleAgregateur"]},"link":[{"relation":"self","url":"https://EDITEUR/Slot?_include=Slot:schedule&status=free&_count=1000"}],"entry":[{"fullUrl":"https://EDITEUR/Practitioner/Practitioner1","resource":{"id":"Practitioner1","resourceType":"Practitioner","meta":{"profile":["http://sas.fr/fhir/StructureDefinition/FrPractitionerAgregateur"]},"identifier":[{"system":"urn:oid:1.2.250.1.71.4.2.1","value":"810100905339","type":{"coding":[{"system":"http://interopsante.org/fhir/CodeSystem/fr-v2-0203","code":"IDNPS"}]}}],"name":[{"family":"Raffi","given":["Thi-Kieu-Thu"]}]}},{"fullUrl":"https://EDITEUR/PractitionerRole/PractitionerRole1","resource":{"id":"PractitionerRole1","resourceType":"PractitionerRole","meta":{"profile":["http://sas.fr/fhir/StructureDefinition/FrPractitionerRoleExerciceAgregateur"]},"contained":[{"id":"Location1","resourceType":"Location","meta":{"profile":["http://sas.fr/fhir/StructureDefinition/FrLocationAgregateur"]},"identifier":[{"system":"https://editeur.com","value":"Location1","type":{"coding":[{"system":"http://interopsante.org/fhir/CodeSystem/fr-location-identifier-type","code":"INTRN"}]}}],"address":{"city":"Castanet-Tolosan","postalCode":"31320","line":["33bis Avenue de Toulouse"]}}],"practitioner":{"reference":"Practitioner/Practitioner1"},"organization":{"identifier":{"system":"urn:oid:1.2.250.1.71.4.2.2","value":"412345678912345","type":{"coding":[{"system":"http://interopsante.org/fhir/CodeSystem/fr-v2-0203","code":"IDNST"}]}}},"location":[{"reference":"#Location1"}],"telecom":[{"system":"phone","value":"+33561813644"}]}},{"fullUrl":"https://EDITEUR/Schedule/Schedule1","resource":{"id":"Schedule1","resourceType":"Schedule","meta":{"profile":["http://sas.fr/fhir/StructureDefinition/FrScheduleAgregateur"]},"actor":[{"reference":"Practitioner/Practitioner1"},{"reference":"PractitionerRole/PractitionerRole1"}]}}]};
+(function addExampleSlots(){
+  const times=[["2026-09-30","09:00","09:20"],["2026-09-29","16:40","17:00"],["2026-09-20","09:00","09:20"],["2026-09-20","16:40","17:00"],["2026-09-21","09:00","09:20"],["2026-09-22","16:40","17:00"]];
+  times.forEach((t,i)=>{
+    const id="Slot"+(i+1);
+    EXAMPLE.entry.push({fullUrl:"https://EDITEUR/Slot/"+id,resource:{id,resourceType:"Slot",status:"free",start:t[0]+"T"+t[1]+":00.000+02:00",end:t[0]+"T"+t[2]+":00.000+02:00",comment:"http://EDITEUR/Slot/"+id,meta:{profile:["http://sas.fr/fhir/StructureDefinition/FrSlotAgregateur"],security:[{system:"https://mos.esante.gouv.fr/NOS/TRE_R314-TypeCreneau/FHIR/TRE-R314-TypeCreneau",code:"PUBLIC"}]},serviceType:[{coding:[{system:"http://terminology.hl7.org/CodeSystem/v3-ActCode",code:"AMB"}]},{text:"Consultation"}],specialty:[{coding:[{system:"https://mos.esante.gouv.fr/NOS/TRE_R38-SpecialiteOrdinale/FHIR/TRE-R38-SpecialiteOrdinale",code:"SM54"}]}],appointmentType:{coding:[{system:"http://terminology.hl7.org/CodeSystem/v2-0276",code:"ROUTINE"}]},schedule:{reference:"Schedule/Schedule1"}}});
+  });
+})();
+
+/* Modèle de Slot par défaut si le Bundle n'en contient aucun */
+const DEFAULT_SLOT = {resourceType:"Slot",status:"free",meta:{profile:["http://sas.fr/fhir/StructureDefinition/FrSlotAgregateur"],security:[{system:"https://mos.esante.gouv.fr/NOS/TRE_R314-TypeCreneau/FHIR/TRE-R314-TypeCreneau",code:"PUBLIC"}]},serviceType:[{coding:[{system:"http://terminology.hl7.org/CodeSystem/v3-ActCode",code:"AMB"}]},{text:"Consultation"}],appointmentType:{coding:[{system:"http://terminology.hl7.org/CodeSystem/v2-0276",code:"ROUTINE"}]}};
+
+const OID_RPPS_IDNPS="urn:oid:1.2.250.1.71.4.2.1";
+const OID_IDNST="urn:oid:1.2.250.1.71.4.2.2";
+const SYS_V2_0203="http://interopsante.org/fhir/CodeSystem/fr-v2-0203";
+const SYS_LOC_ID="http://interopsante.org/fhir/CodeSystem/fr-location-identifier-type";
+const PROF={
+  bundle:"http://sas.fr/fhir/StructureDefinition/BundleAgregateur",
+  pract:"http://sas.fr/fhir/StructureDefinition/FrPractitionerAgregateur",
+  role:"http://sas.fr/fhir/StructureDefinition/FrPractitionerRoleExerciceAgregateur",
+  loc:"http://sas.fr/fhir/StructureDefinition/FrLocationAgregateur",
+  sched:"http://sas.fr/fhir/StructureDefinition/FrScheduleAgregateur"
+};
+function emptyBundle(){
+  return {id:uuid(),resourceType:"Bundle",type:"searchset",total:0,meta:{profile:[PROF.bundle]},
+    link:[{relation:"self",url:"https://EDITEUR/Slot?_include=Slot:schedule&_include:iterate=Schedule:actor&status=free&_count=1000"}],entry:[]};
+}
+const SYS_R314="https://mos.esante.gouv.fr/NOS/TRE_R314-TypeCreneau/FHIR/TRE-R314-TypeCreneau";
+const SYS_R38="https://mos.esante.gouv.fr/NOS/TRE_R38-SpecialiteOrdinale/FHIR/TRE-R38-SpecialiteOrdinale";
+const R314_ORDER=["PUBLIC","PRO","SNP"];
+const SYS_ACT="http://terminology.hl7.org/CodeSystem/v3-ActCode";
+const ACT_ORDER=["AMB","HH","VR"];
+const ACT_LABEL={AMB:"Cabinet",HH:"Domicile",VR:"Téléconsultation"};
+const MODE_OPTIONS=[["AMB"],["HH"],["VR"],["AMB","HH"],["AMB","VR"],["HH","VR"],["AMB","HH","VR"]]
+  .map(c=>({value:c.join("+"),label:c.join(" + ")+" — "+c.map(x=>ACT_LABEL[x]).join(", ")}));
+function parseMode(r){
+  const codes=(r.serviceType||[]).flatMap(x=>x.coding||[]).filter(c=>c.system===SYS_ACT).map(c=>c.code);
+  return ACT_ORDER.filter(c=>codes.includes(c)).join("+");
+}
+const R314_LABEL={PUBLIC:"Grand public",PRO:"Professionnels",SNP:"Régulateurs / OSNP"};
+const SECURITY_OPTIONS=[["PUBLIC"],["PRO"],["SNP"],["PUBLIC","PRO"],["PUBLIC","SNP"],["PRO","SNP"],["PUBLIC","PRO","SNP"]]
+  .map(c=>({value:c.join("+"),label:c.join(" + ")+" — "+c.map(x=>R314_LABEL[x]).join(", ")}));
+/* TRE_R38 (MOS, version 2026-07-30), codes actifs. Les codes du JDV_J239 SpecialitesSNP-SAS sont proposés en premier. */
+const R38=[["SCD01","Orthopédie dento-faciale"],["SCD02","Chirurgie orale (SCD)"],["SCD03","Médecine bucco-dentaire"],["SI01","IPA pathologies chroniques stabilisées"],["SI02","IPA oncologie et hémato-oncologie"],["SI03","IPA maladie rénale chronique"],["SI04","IPA santé mentale"],["SI05","IPA urgences"],["SI06","Infirmier(ère) de bloc opératoire"],["SI07","Infirmier(ère) anesthésiste"],["SI08","Infirmier(ère) puériculteur(trice)"],["SM01","Anatomie et Cytologie pathologiques"],["SM02","Anesthésie-réanimation"],["SM03","Biologie médicale"],["SM04","Cardiologie et Maladies vasculaires"],["SM05","Chirurgie générale"],["SM06","Chirurgie maxillo-faciale"],["SM07","Chirurgie maxillo-faciale et Stomatologie"],["SM08","Chirurgie orthopédique et Traumatologie"],["SM09","Chirurgie infantile"],["SM10","Chirurgie plastique reconstructrice et esthétique"],["SM11","Chirurgie thoracique et cardio-vasculaire"],["SM12","Chirurgie urologique"],["SM13","Chirurgie vasculaire"],["SM14","Chirurgie viscérale et digestive"],["SM15","Dermatologie et Vénéréologie"],["SM16","Endocrinologie et Métabolisme"],["SM17","Génétique médicale"],["SM18","Gériatrie"],["SM19","Gynécologie médicale"],["SM20","Gynécologie-obstétrique"],["SM21","Hématologie"],["SM22","Hématologie, option Maladie du sang"],["SM23","Hématologie, option Onco-hématologie"],["SM24","Gastro-entérologie et Hépatologie"],["SM25","Médecine du travail"],["SM26","Qualifié en Médecine générale"],["SM27","Médecine interne"],["SM28","Médecine nucléaire"],["SM29","Médecine physique et de réadaptation"],["SM30","Néphrologie"],["SM31","Neuro-chirurgie"],["SM32","Neurologie"],["SM33","Neuro-psychiatrie"],["SM34","ORL et Chirurgie cervico-faciale"],["SM35","Oncologie, option Onco-hématologie"],["SM36","Oncologie, option médicale"],["SM37","Oncologie, option radiothérapie"],["SM38","Ophtalmologie"],["SM39","Oto-rhino-laryngologie"],["SM40","Pédiatrie"],["SM41","Pneumologie"],["SM42","Psychiatrie"],["SM43","Psychiatrie, option enfant et adolescent"],["SM44","Radio-diagnostic"],["SM45","Radio-thérapie"],["SM46","Médecine intensive-réanimation"],["SM47","Recherche médicale"],["SM48","Rhumatologie"],["SM49","Santé publique et Médecine sociale"],["SM50","Stomatologie"],["SM51","Gynéco-obstétrique et Gynéco-médicale, opt. Gynéco-obstétrique"],["SM52","Gynéco-obstétrique et Gynéco-médicale, opt. Gynéco-médicale"],["SM53","Spécialiste en Médecine générale"],["SM54","Médecine générale"],["SM55","Radio-diagnostic et Radio-thérapie"],["SM56","Chirurgie orale (SM)"],["SM57","Allergologie"],["SM58","Maladies infectieuses et tropicales"],["SM59","Médecine d'urgence"],["SM60","Médecine légale et expertises médicales"],["SM61","Médecine vasculaire"],["SM62","Endocrinologie, diabétologie, nutrition"],["SM63","Biologie médicale opt. biologie générale"],["SM64","Biologie médicale opt. médecine moléculaire, génétique et pharmacologie"],["SM65","Biologie médicale opt. hématologie et immunologie"],["SM66","Biologie médicale opt. agents infectieux"],["SM67","Biologie médicale opt. biologie de la reproduction"],["SM68","Chirurgie maxillo-faciale (réforme 2017)"],["SM69","Chirurgie pédiatrique opt. viscérale pédiatrique"],["SM70","Chirurgie pédiatrique opt. orthopédie pédiatrique"],["SM71","Hématologie (réforme 2017)"],["SM72","Médecine interne et immunologie clinique"],["SM73","Médecine cardiovasculaire"],["SM74","Radiologie imagerie médicale"],["SM75","Santé publique"],["SM76","Anesthésie-réanimation opt. anesthésie pédiatrique"],["SM77","Chirurgie maxillo-faciale opt. orthodontie des dysmorphies"],["SM78","Chirurgie viscérale et digestive opt. endoscopie chirurgicale"],["SM79","Médecine cardiovasculaire opt. cardiologie interventionnelle"],["SM80","Médecine cardiovasculaire opt. imagerie cardio d'expert"],["SM81","Médecine cardiovasculaire opt. rythmologie interventionnelle"],["SM82","Médecine intensive-réanimation opt. réanimation pédiatrique"],["SM83","Néphrologie opt. soins intensifs néphrologiques"],["SM84","Neurologie opt. traitement interventionnel ischémie cérébrale aiguë"],["SM85","Ophtalmologie opt. chirurgie ophtalmopédiatrique et strabologique"],["SM86","ORL opt. audiophonologie"],["SM87","Pédiatrie opt. néonatologie"],["SM88","Pédiatrie opt. neuropédiatrie"],["SM89","Pédiatrie opt. pneumopédiatrie"],["SM90","Pédiatrie opt. réanimation pédiatrique"],["SM91","Pneumologie opt. soins intensifs respiratoires"],["SM92","Psychiatrie opt. enfant et adolescent"],["SM93","Psychiatrie opt. psychiatrie de la personne âgée"],["SM94","Radiologie opt. radiologie interventionnelle avancée"],["SM95","Santé publique opt. administration de la santé"]];
+const R38_LABEL=Object.fromEntries(R38);
+const J239=["SM54","SM03","SM04","SM15","SM16","SM19","SM20","SM21","SM32","SM36","SM38","SM39","SM40","SM42","SM43","SM44","SM57"];
+
+function parseSecurity(r){
+  const codes=((r.meta&&r.meta.security)||[]).filter(x=>x.system===SYS_R314).map(x=>x.code);
+  return R314_ORDER.filter(c=>codes.includes(c)).join("+");
+}
+function parseSpecialty(r){
+  const sp=r.specialty;
+  if(!sp||!sp.length) return {code:"",orig:null};
+  const codings=sp.flatMap(x=>x.coding||[]);
+  if(sp.length===1 && codings.length===1 && codings[0].system===SYS_R38 && R38_LABEL[codings[0].code]) return {code:codings[0].code,orig:null};
+  const label=sp.map(x=>(x.coding||[]).map(c=>c.code).join("/")||x.text||"?").join(", ");
+  return {code:"__orig",orig:label};
+}
+
+/* ---------- État ---------- */
+let S = null; // {bundle, practs:[...], schedules:Map, slots:[...], orphanSlots:[], unknownScheds:[]}
+let uidSeq = 0;
+
+const $ = s => document.querySelector(s);
+const el = (tag, attrs={}, ...kids) => {
+  const e=document.createElement(tag);
+  for(const [k,v] of Object.entries(attrs)){
+    if(k==="class") e.className=v; else if(k==="text") e.textContent=v;
+    else if(k.startsWith("on")) e.addEventListener(k.slice(2),v);
+    else if(v!==undefined && v!==null && v!==false) e.setAttribute(k,v===true?"":v);
+  }
+  kids.flat().forEach(c=>{ if(c!=null) e.append(c.nodeType?c:document.createTextNode(c)); });
+  return e;
+};
+const clone = o => JSON.parse(JSON.stringify(o));
+
+/* Normalise une référence : "https://x/Practitioner/P1" → "Practitioner/P1" */
+function refKey(ref){
+  if(!ref) return null;
+  const parts=String(ref).split("/").filter(Boolean);
+  if(parts.length<2) return ref;
+  const n=parts.length;
+  if(parts[n-2]==="_history" && n>=4) return parts[n-4]+"/"+parts[n-3];
+  return parts[n-2]+"/"+parts[n-1];
+}
+function resKey(r){ return r.resourceType+"/"+r.id; }
+
+/* ---------- Fuseaux ---------- */
+function tzOffsetMin(date, time, tz){
+  const [y,m,d]=date.split("-").map(Number); const [h,mi]=time.split(":").map(Number);
+  const wall=Date.UTC(y,m-1,d,h,mi);
+  const fmt=new Intl.DateTimeFormat("en-US",{timeZone:tz,hourCycle:"h23",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
+  let guess=wall;
+  for(let i=0;i<3;i++){
+    const p=Object.fromEntries(fmt.formatToParts(new Date(guess)).map(x=>[x.type,x.value]));
+    const asUTC=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour%24,+p.minute);
+    const off=(asUTC-guess)/60000;
+    const next=wall-off*60000;
+    if(next===guess) return off;
+    guess=next;
+  }
+  return (wall-guess)/60000;
+}
+function fmtOffset(min){
+  const s=min>=0?"+":"-"; const a=Math.abs(min);
+  return s+String(Math.floor(a/60)).padStart(2,"0")+":"+String(a%60).padStart(2,"0");
+}
+function toFhirInstant(date,time,tz){
+  if(!date||!time) return null;
+  return date+"T"+time+":00.000"+fmtOffset(tzOffsetMin(date,time,tz));
+}
+function epoch(date,time,tz){
+  const iso=toFhirInstant(date,time,tz); return iso?Date.parse(iso):NaN;
+}
+function parseFhirDate(s){
+  const m=/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(s||"");
+  return m?{date:m[1],time:m[2]}:{date:"",time:""};
+}
+function addMinutes(date,time,min){
+  const [y,m,d]=date.split("-").map(Number); const [h,mi]=time.split(":").map(Number);
+  const t=new Date(Date.UTC(y,m-1,d,h,mi)+min*60000);
+  return {date:t.toISOString().slice(0,10), time:t.toISOString().slice(11,16)};
+}
+function addDays(date,n){ return addMinutes(date,"00:00",n*1440).date; }
+function todayIn(tz){
+  const p=Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone:tz,year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date()).map(x=>[x.type,x.value]));
+  return p.year+"-"+p.month+"-"+p.day;
+}
+function dayLabel(date){
+  if(!date) return "";
+  const [y,m,d]=date.split("-").map(Number);
+  return new Date(Date.UTC(y,m-1,d)).toLocaleDateString("fr-FR",{weekday:"short",timeZone:"UTC"});
+}
+
+/* ---------- Parsing ---------- */
+function parseBundle(json){
+  if(!json || json.resourceType!=="Bundle") throw new Error("La ressource racine n'est pas un Bundle (resourceType attendu : \"Bundle\").");
+  if(!Array.isArray(json.entry)) json.entry=[];
+  const byKey=new Map(), practs=[], roles=[], scheds=[], slotsRaw=[], others=[];
+  json.entry.forEach(e=>{
+    const r=e && e.resource; if(!r||!r.resourceType){ others.push(e); return; }
+    if(r.id) byKey.set(resKey(r),e);
+    if(r.resourceType==="Practitioner") practs.push(e);
+    else if(r.resourceType==="PractitionerRole") roles.push(e);
+    else if(r.resourceType==="Schedule") scheds.push(e);
+    else if(r.resourceType==="Slot") slotsRaw.push(e);
+    else others.push(e);
+  });
+  const baseMatch=json.entry.map(e=>/^(.*\/)(Practitioner|PractitionerRole|Schedule|Slot)\/[^/]+$/.exec(e.fullUrl||"")).find(Boolean);
+  const model={bundle:json, base:baseMatch?baseMatch[1]:"https://EDITEUR/", practs:[], schedules:new Map(), slots:[], orphanSlots:[], unassignedScheds:[], others};
+
+  const practMap=new Map();
+  practs.forEach(e=>{
+    const r=e.resource;
+    const idf=(r.identifier||[]).find(i=>i.system===OID_RPPS_IDNPS)||(r.identifier||[])[0]||{};
+    const nm=(r.name||[])[0]||{};
+    const p={key:resKey(r), id:r.id, fullUrl:e.fullUrl||"", orig:r, extra:entryExtras(e),
+      family:nm.family||"", given:(nm.given||[]).join(" "), prefix:(nm.prefix||[]).join(" "), idnps:idf.value||"",
+      roles:[], directScheds:[], editing:false, isNew:false};
+    p.init={family:p.family, given:p.given, idnps:p.idnps};
+    practMap.set(p.key,p); model.practs.push(p);
+  });
+
+  const roleMap=new Map();
+  roles.forEach(e=>{
+    const r=e.resource;
+    const pKey=refKey(r.practitioner&&r.practitioner.reference);
+    const contained=new Map((r.contained||[]).map(c=>["#"+c.id,c]));
+    let loc=null, locContained=false;
+    for(const l of (r.location||[])){
+      const ref=l.reference||"";
+      if(contained.has(ref)){ loc=contained.get(ref); locContained=true; break; }
+      const ext=byKey.get(refKey(ref)); if(ext){ loc=ext.resource; break; }
+    }
+    const a=(loc&&loc.address)||{};
+    const locIdf=((loc&&loc.identifier)||[])[0]||{};
+    const role={key:resKey(r), id:r.id, fullUrl:e.fullUrl||"", orig:r, extra:entryExtras(e), locId:loc&&loc.id, locContained, locName:loc&&loc.name,
+      line:(a.line||[]).join(", "), postalCode:a.postalCode||"", city:a.city||"",
+      phone:((r.telecom||[]).find(t=>t.system==="phone")||{}).value||"",
+      orgValue:(r.organization&&r.organization.identifier&&r.organization.identifier.value)||"",
+      locIdent:locIdf.value||"", schedules:[], isNew:false};
+    role.init={line:role.line, postalCode:role.postalCode, city:role.city, phone:role.phone, orgValue:role.orgValue, locIdent:role.locIdent};
+    roleMap.set(role.key,role);
+    let p=practMap.get(pKey);
+    if(!p){ p={key:pKey||"?", id:(pKey||"?").split("/").pop(), family:"(professionnel non inclus dans le Bundle)", given:"", prefix:"", idnps:"", roles:[], directScheds:[], missing:true}; practMap.set(p.key,p); model.practs.push(p); }
+    p.roles.push(role);
+  });
+
+  scheds.forEach(e=>{
+    const r=e.resource;
+    const sch={key:resKey(r), id:r.id, fullUrl:e.fullUrl||"", orig:r, extra:entryExtras(e)};
+    model.schedules.set(sch.key,sch);
+    const actors=(r.actor||[]).map(a=>refKey(a.reference));
+    const roleKey=actors.find(k=>roleMap.has(k));
+    if(roleKey){ roleMap.get(roleKey).schedules.push(sch); return; }
+    const pKey=actors.find(k=>practMap.has(k));
+    if(pKey){ practMap.get(pKey).directScheds.push(sch); return; }
+    model.unassignedScheds.push(sch);
+  });
+
+  slotsRaw.forEach(e=>{
+    const r=e.resource;
+    const sKey=refKey(r.schedule&&r.schedule.reference);
+    const st=parseFhirDate(r.start), en=parseFhirDate(r.end);
+    const spc=parseSpecialty(r);
+    const slot={uid:++uidSeq, id:r.id, fullUrl:e.fullUrl||"", template:r, entryExtra:entryExtras(e), scheduleKey:sKey, date:st.date, start:st.time, endDate:en.date, end:en.time, isNew:false, security:parseSecurity(r), mode:parseMode(r), specialty:spc.code, specialtyOrig:spc.orig};
+    if(model.schedules.has(sKey)) model.slots.push(slot); else model.orphanSlots.push(slot);
+  });
+  return model;
+}
+function entryExtras(e){ const x={...e}; delete x.resource; delete x.fullUrl; return x; }
+
+/* ---------- Rendu ---------- */
+const PIN='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
+
+function field(label, value, onInput, opts={}){
+  const id="f"+(++uidSeq);
+  const inp=el("input",{id, type:opts.type||"text", value:value||"", placeholder:opts.placeholder||"", inputmode:opts.inputmode, maxlength:opts.maxlength, autocomplete:"off", spellcheck:"false"});
+  const check=()=>{ const bad=opts.validate?opts.validate(inp.value):null; inp.classList.toggle("bad",!!bad); hint.textContent=bad||opts.hint||""; hint.classList.toggle("errtxt",!!bad); };
+  const hint=el("span",{class:"hint"});
+  inp.addEventListener("input",()=>{ onInput(inp.value.trim()); check(); scheduleExport(); });
+  check();
+  return el("div",{class:"fld"+(opts.wide?" wide":"")}, el("label",{for:id,text:label}), inp, hint);
+}
+const V={
+  required:v=>v.trim()?null:"Obligatoire",
+  idnps:v=>!v.trim()?"Obligatoire":(/^8\d{11}$/.test(v.trim())||/^0\d{9}$/.test(v.trim()))?null:"Attendu : 8 + RPPS (12 chiffres) ou 0 + ADELI",
+  cp:v=>!v.trim()?"Obligatoire":/^\d{5}$/.test(v.trim())?null:"5 chiffres attendus",
+  phone:v=>!v.trim()?null:/^\+?\d{9,15}$/.test(v.replace(/[\s.]/g,""))?null:"Format attendu : +33XXXXXXXXX",
+  idnst:v=>!v.trim()?"Obligatoire":/^[0-4]\d{8,14}$/.test(v.trim())?null:"Préfixe 1 FINESS, 2 SIREN, 3 SIRET ou 4 RPPS rang, suivi de l'identifiant"
+};
+
+function render(){
+  const root=$("#practs"); root.textContent="";
+  if(!S.practs.length) root.append(el("div",{class:"panel empty-state"},"Le Bundle ne contient aucun professionnel. ",el("button",{class:"btn primary",onclick:addPract},"＋ Ajouter un professionnel")));
+  S.practs.forEach(p=>{
+    const box=el("article",{class:"panel pract"+(p.editing?" editing":"")});
+    let head;
+    if(p.editing){
+      head=el("div",{class:"pract-head edit"},
+        el("div",{class:"formgrid"},
+          field("Nom",p.family,v=>p.family=v,{validate:V.required}),
+          field("Prénom(s)",p.given,v=>p.given=v,{hint:"Plusieurs prénoms séparés par un espace"}),
+          field("RPPS",p.idnps,v=>p.idnps=v,{validate:V.idnps,inputmode:"numeric",maxlength:12})
+        ),
+        el("div",{class:"row"},
+          el("button",{class:"btn primary",onclick:()=>{p.editing=false;render();}},"Terminer la modification"),
+          el("button",{class:"btn ghost",onclick:()=>removePract(p)},"Supprimer le professionnel"))
+      );
+    } else {
+      head=el("div",{class:"pract-head"},
+        el("div",{class:"name"}, p.prefix?p.prefix+" ":"", p.given?p.given+" ":"", el("span",{class:"family",text:p.family||"(sans nom)"})),
+        el("div",{class:"idbox"},
+          el("span",{},"RPPS ",el("b",{text:p.idnps||"—"})),
+          el("span",{},"Ressource ",el("b",{text:p.id}))
+        ),
+        p.missing?el("span",{class:"ro",text:"lecture seule"}):el("button",{class:"btn",onclick:()=>{p.editing=true;render();}},"Modifier")
+      );
+    }
+    box.append(head);
+    if(!p.roles.length && !p.directScheds.length){
+      box.append(el("div",{class:"role empty",text:"Aucun lieu d'exercice : ajoutez une adresse pour pouvoir créer des créneaux."}));
+    }
+    p.roles.forEach(role=>box.append(renderRole(role,p)));
+    if(p.directScheds.length){
+      const r=el("div",{class:"role"}, el("div",{class:"addr"}, el("div",{}, el("div",{class:"lines",text:"Agenda sans lieu d'exercice"}), el("div",{class:"meta",text:"Schedule rattaché directement au Practitioner"}))));
+      p.directScheds.forEach(s=>r.append(renderSchedule(s)));
+      box.append(r);
+    }
+    if(!p.missing) box.append(el("div",{class:"role addrole"}, el("button",{class:"btn",onclick:()=>addRole(p)},"＋ Ajouter une adresse")));
+    root.append(box);
+  });
+  if(S.unassignedScheds.length){
+    const box=el("article",{class:"panel pract"}, el("div",{class:"pract-head"}, el("div",{class:"name",text:"Agendas sans acteur identifié"})));
+    const r=el("div",{class:"role"}); S.unassignedScheds.forEach(s=>r.append(renderSchedule(s))); box.append(r); root.append(box);
+  }
+  const o=$("#orphans"); o.textContent="";
+  if(S.orphanSlots.length){
+    o.append(el("div",{class:"orphans"}, `${S.orphanSlots.length} créneau(x) référencent un Schedule absent du Bundle (${[...new Set(S.orphanSlots.map(s=>s.scheduleKey||"sans référence"))].join(", ")}). Ils sont conservés tels quels à l'export.`));
+  }
+  refreshExport();
+}
+
+function searchUrl(role,p){
+  const id=(p.idnps||"").trim();
+  const text=id.length>1?id.slice(1):"";
+  const loc=[role.line,role.postalCode,role.city].map(x=>(x||"").trim()).filter(Boolean).join(" ");
+  if(!text||!loc) return null;
+  const base=($("#sasUrl").value||"").trim();
+  return base+(base.includes("?")?"&":"?")+"text="+encodeURIComponent(text)+"&loc="+encodeURIComponent(loc);
+}
+function searchLink(role,p){
+  const a=el("a",{class:"btn search",target:"_blank",rel:"noopener"},"Lancer une recherche");
+  role._a=a; role._p=p; updateSearchLink(role);
+  return a;
+}
+function updateSearchLink(role){
+  const a=role._a; if(!a||!a.isConnected&&a.parentNode) return;
+  const url=role._p.missing?null:searchUrl(role,role._p);
+  if(url){ a.href=url; a.title=url; a.removeAttribute("aria-disabled"); a.classList.remove("off"); }
+  else { a.removeAttribute("href"); a.title="RPPS et adresse complète nécessaires"; a.setAttribute("aria-disabled","true"); a.classList.add("off"); }
+}
+function refreshSearchLinks(){ S.practs.forEach(p=>p.roles.forEach(updateSearchLink)); }
+
+function renderRole(role,p){
+  const wrap=el("div",{class:"role"});
+  if(p.editing){
+    const ad=el("div",{class:"addr"}); ad.innerHTML=PIN;
+    const grid=el("div",{class:"formgrid"});
+    if(role.locContained || role.isNew){
+      grid.append(
+        field("Adresse (n° et voie)",role.line,v=>role.line=v,{validate:V.required,wide:true,placeholder:"33bis Avenue de Toulouse"}),
+        field("Code postal",role.postalCode,v=>role.postalCode=v,{validate:V.cp,inputmode:"numeric",maxlength:5}),
+        field("Ville",role.city,v=>role.city=v,{validate:V.required}),
+      );
+    } else grid.append(el("div",{class:"fld wide hint",text:"Location référencée hors de la ressource : adresse non modifiable ici."}));
+    grid.append(
+      field("Téléphone",role.phone,v=>role.phone=v,{validate:V.phone,inputmode:"tel",placeholder:"+33561813644"}),
+      field("Identifiant de structure (IDNST)",role.orgValue,v=>role.orgValue=v,{validate:V.idnst,inputmode:"numeric",hint:"1 FINESS · 2 SIREN · 3 SIRET · 4 RPPS rang"})
+    );
+    if(role.locContained || role.isNew) grid.append(field("Identifiant interne du lieu",role.locIdent,v=>role.locIdent=v,{hint:"Location.identifier (INTRN)"}));
+    ad.append(el("div",{class:"grow"},grid,el("div",{class:"meta",text:role.id+(role.locId?" / "+role.locId:"")+(role.schedules[0]?" / "+role.schedules.map(s=>s.id).join(", "):"")})),
+      el("div",{class:"addr-actions"}, searchLink(role,p), el("button",{class:"btn ghost",onclick:()=>removeRole(p,role)},"Supprimer l'adresse")));
+    wrap.append(ad);
+  } else {
+    const lines=[role.line,[role.postalCode,role.city].filter(Boolean).join(" ")].filter(Boolean).join(" — ")||role.locName||"Adresse non renseignée";
+    const meta=[];
+    if(role.phone) meta.push("Tél. "+role.phone);
+    if(role.orgValue) meta.push("Structure "+role.orgValue);
+    meta.push(role.id+(role.locId?" / "+role.locId:""));
+    const ad=el("div",{class:"addr"}); ad.innerHTML=PIN;
+    ad.append(el("div",{class:"grow"}, el("div",{class:"lines",text:lines}), el("div",{class:"meta",text:meta.join("   ·   ")})), el("div",{class:"addr-actions"}, searchLink(role,p)));
+    wrap.append(ad);
+  }
+  if(!role.schedules.length) wrap.append(el("div",{class:"empty",text:"Aucun Schedule ne référence ce lieu d'exercice : impossible d'y ajouter des créneaux."}));
+  role.schedules.forEach(s=>wrap.append(renderSchedule(s, role.schedules.length>1)));
+  return wrap;
+}
+
+function renderSchedule(sch, showId=true){
+  const frag=el("div",{});
+  if(showId) frag.append(el("div",{class:"sched-id",text:"Agenda "+sch.id}));
+  const slots=S.slots.filter(s=>s.scheduleKey===sch.key).sort(cmpSlot);
+  const tbody=el("tbody");
+  if(!slots.length) tbody.append(el("tr",{},el("td",{colspan:"8",class:"empty",text:"Aucun créneau. Ajoutez-en un ci-dessous."})));
+  slots.forEach(s=>tbody.append(renderSlotRow(s)));
+  frag.append(el("div",{class:"tablewrap"}, el("table",{class:"slots"},
+    el("thead",{},el("tr",{}, el("th",{text:"Date"}), el("th",{text:"Début"}), el("th",{text:"Fin"}), el("th",{text:"Type de créneau"}), el("th",{text:"Mode de consultation"}), el("th",{text:"Spécialité"}), el("th",{text:"Contrôles"}), el("th",{},el("span",{class:"sr",text:""})))),
+    tbody)));
+  frag.append(el("button",{class:"btn addslot",onclick:()=>addSlot(sch)},"＋ Ajouter un créneau"));
+  return frag;
+}
+
+function cmpSlot(a,b){ return (a.date+a.start).localeCompare(b.date+b.start); }
+
+function slotIssues(s){
+  const tz=$("#tz").value, out=[];
+  if(!s.date||!s.start||!s.end){ out.push(["err","incomplet"]); return out; }
+  const st=epoch(s.date,s.start,tz), en=epoch(s.endDate||s.date,s.end,tz);
+  if(!(en>st)) out.push(["err","fin ≤ début"]);
+  if(st<Date.now()) out.push(["warn","passé"]);
+  if(!s.security) out.push(["warn","sans type"]);
+  if(!s.mode) out.push(["warn","sans mode"]);
+  const same=S.slots.filter(o=>o!==s && o.scheduleKey===s.scheduleKey && o.date && o.start && o.end);
+  if(same.some(o=>{const os=epoch(o.date,o.start,tz), oe=epoch(o.endDate||o.date,o.end,tz); return st<oe && os<en;})) out.push(["warn","chevauchement"]);
+  return out;
+}
+
+function renderSlotRow(s){
+  const tr=el("tr",{"data-uid":s.uid});
+  const dIn=el("input",{type:"date",value:s.date,"aria-label":"Date du créneau "+s.id});
+  const sIn=el("input",{type:"time",value:s.start,step:"300","aria-label":"Heure de début"});
+  const eIn=el("input",{type:"time",value:s.end,step:"300","aria-label":"Heure de fin"});
+  const durCell=el("span",{class:"dur"}), tagCell=el("td");
+  const secSel=el("select",{class:"sel","aria-label":"Type de créneau "+s.id});
+  secSel.append(el("option",{value:"",text:"(aucun)"}));
+  SECURITY_OPTIONS.forEach(o=>secSel.append(el("option",{value:o.value,text:o.label})));
+  secSel.value=s.security;
+  secSel.addEventListener("change",()=>{ s.security=secSel.value; refreshAll(); });
+  const modeSel=el("select",{class:"sel","aria-label":"Mode de consultation "+s.id});
+  modeSel.append(el("option",{value:"",text:"(aucun)"}));
+  MODE_OPTIONS.forEach(o=>modeSel.append(el("option",{value:o.value,text:o.label})));
+  modeSel.value=s.mode;
+  modeSel.addEventListener("change",()=>{ s.mode=modeSel.value; refreshAll(); });
+  const spSel=el("select",{class:"sel","aria-label":"Spécialité "+s.id});
+  if(s.specialtyOrig) spSel.append(el("option",{value:"__orig",text:"Valeur d'origine : "+s.specialtyOrig}));
+  spSel.append(el("option",{value:"",text:"(aucune)"}));
+  const g1=el("optgroup",{label:"Spécialités SAS / SNP (JDV J239)"}), g2=el("optgroup",{label:"Autres spécialités ordinales (TRE R38)"});
+  J239.forEach(c=>g1.append(el("option",{value:c,text:c+" — "+R38_LABEL[c]})));
+  R38.filter(([c])=>!J239.includes(c)).forEach(([c,l])=>g2.append(el("option",{value:c,text:c+" — "+l})));
+  spSel.append(g1,g2); spSel.value=s.specialty;
+  spSel.addEventListener("change",()=>{ s.specialty=spSel.value; refreshAll(); });
+  const dayTxt=el("span",{class:"dur"});
+  const update=()=>{
+    const tz=$("#tz").value;
+    dayTxt.textContent=" "+dayLabel(s.date);
+    const st=epoch(s.date,s.start,tz), en=epoch(s.endDate||s.date,s.end,tz);
+    durCell.textContent=(en>st)?Math.round((en-st)/60000)+" min":"—";
+    tagCell.textContent="";
+    if(s.isNew) tagCell.append(el("span",{class:"tag new",text:"nouveau"}));
+    const iss=slotIssues(s);
+    iss.forEach(([k,t])=>tagCell.append(el("span",{class:"tag "+k,text:t})));
+    eIn.classList.toggle("bad",iss.some(i=>i[1]==="fin ≤ début"));
+    if(!iss.length && !s.isNew) tagCell.append(el("span",{class:"dur",text:"ok"}));
+  };
+  dIn.addEventListener("change",()=>{ s.date=dIn.value; s.endDate=dIn.value; refreshAll(); });
+  sIn.addEventListener("change",()=>{
+    const tz=$("#tz").value;
+    const oldDur=Math.round((epoch(s.endDate||s.date,s.end,tz)-epoch(s.date,s.start,tz))/60000);
+    s.start=sIn.value;
+    if(oldDur>0 && s.start){ const n=addMinutes(s.date,s.start,oldDur); s.endDate=n.date; s.end=n.time; eIn.value=s.end; }
+    refreshAll();
+  });
+  eIn.addEventListener("change",()=>{ s.end=eIn.value; s.endDate=s.date; refreshAll(); });
+  tr._update=update;
+  tr.append(
+    el("td",{},dIn,dayTxt),
+    el("td",{},sIn),
+    el("td",{},eIn," ",durCell),
+    el("td",{},secSel),
+    el("td",{},modeSel),
+    el("td",{},spSel),
+    tagCell,
+    el("td",{style:"text-align:right"}, el("span",{class:"sid",text:s.id+" "}), el("button",{class:"btn ghost",title:"Supprimer "+s.id,"aria-label":"Supprimer le créneau "+s.id,onclick:()=>{ S.slots=S.slots.filter(x=>x!==s); render(); toast(s.id+" supprimé"); }},"Supprimer"))
+  );
+  update();
+  return tr;
+}
+
+function refreshAll(){
+  document.querySelectorAll("tr[data-uid]").forEach(tr=>tr._update&&tr._update());
+  refreshExport();
+}
+
+/* ---------- Actions ---------- */
+function _unusedNextSlotId(){
+  const used=new Set([...S.slots,...S.orphanSlots].map(s=>s.id));
+  S.bundle.entry.forEach(e=>e.resource&&e.resource.id&&used.add(e.resource.id));
+  let n=0; used.forEach(id=>{const m=/^Slot(\d+)$/.exec(id); if(m) n=Math.max(n,+m[1]);});
+  let id; do{ id="Slot"+(++n); }while(used.has(id));
+  return id;
+}
+function allIds(){
+  const used=new Set();
+  S.practs.forEach(p=>{ used.add(p.id); p.roles.forEach(r=>{ used.add(r.id); if(r.locId) used.add(r.locId); r.schedules.forEach(s=>used.add(s.id)); }); p.directScheds.forEach(s=>used.add(s.id)); });
+  S.unassignedScheds.forEach(s=>used.add(s.id));
+  [...S.slots,...S.orphanSlots].forEach(s=>used.add(s.id));
+  S.bundle.entry.forEach(e=>{ const r=e.resource; if(r&&r.id) used.add(r.id); ((r&&r.contained)||[]).forEach(c=>used.add(c.id)); });
+  return used;
+}
+function nextId(prefix){
+  const used=allIds(); let n=0;
+  used.forEach(id=>{ const m=new RegExp("^"+prefix+"(\\d+)$").exec(id); if(m) n=Math.max(n,+m[1]); });
+  let id; do{ id=prefix+(++n); }while(used.has(id));
+  return id;
+}
+function addRole(p, silent){
+  const roleId=nextId("PractitionerRole");
+  const role={key:"PractitionerRole/"+roleId, id:roleId, fullUrl:S.base+"PractitionerRole/"+roleId, orig:null, extra:{}, locId:null, locContained:true,
+    line:"", postalCode:"", city:"", phone:"", orgValue:"", locIdent:"", schedules:[], isNew:true, init:{}};
+  p.roles.push(role);
+  role.locId=nextId("Location"); role.locIdent=role.locId;
+  const schId=nextId("Schedule");
+  const sch={key:"Schedule/"+schId, id:schId, fullUrl:S.base+"Schedule/"+schId, orig:null, extra:{}, isNew:true, practId:p.id, roleId};
+  S.schedules.set(sch.key,sch); role.schedules.push(sch);
+  p.editing=true;
+  if(!silent){ render(); toast("Adresse ajoutée : complétez-la"); }
+}
+function addPract(){
+  const id=nextId("Practitioner");
+  const p={key:"Practitioner/"+id, id, fullUrl:S.base+"Practitioner/"+id, orig:null, extra:{}, family:"", given:"", prefix:"", idnps:"", roles:[], directScheds:[], editing:true, isNew:true, init:{}};
+  S.practs.push(p);
+  addRole(p,true);
+  render();
+  const box=[...document.querySelectorAll("article.pract")].pop(); if(box){ box.scrollIntoView({behavior:"smooth",block:"start"}); const f=box.querySelector("input"); if(f) f.focus({preventScroll:true}); }
+  toast("Professionnel ajouté : complétez sa fiche");
+}
+function dropSchedules(scheds){
+  const keys=new Set(scheds.map(s=>s.key));
+  scheds.forEach(s=>S.schedules.delete(s.key));
+  const n=S.slots.filter(s=>keys.has(s.scheduleKey)).length;
+  S.slots=S.slots.filter(s=>!keys.has(s.scheduleKey));
+  return n;
+}
+function removeRole(p,role){
+  const n=S.slots.filter(s=>role.schedules.some(x=>x.key===s.scheduleKey)).length;
+  if(n && !confirm(`Supprimer cette adresse et ses ${n} créneau(x) ?`)) return;
+  dropSchedules(role.schedules);
+  p.roles=p.roles.filter(r=>r!==role);
+  render(); toast("Adresse supprimée");
+}
+function removePract(p){
+  const scheds=[...p.roles.flatMap(r=>r.schedules),...p.directScheds];
+  const n=S.slots.filter(s=>scheds.some(x=>x.key===s.scheduleKey)).length;
+  if(!confirm(`Supprimer ${p.family||"ce professionnel"}, ses ${p.roles.length} adresse(s) et ${n} créneau(x) ?`)) return;
+  dropSchedules(scheds);
+  S.practs=S.practs.filter(x=>x!==p);
+  render(); toast("Professionnel supprimé");
+}
+let expTimer; function scheduleExport(){ clearTimeout(expTimer); expTimer=setTimeout(refreshExport,150); }
+
+function addSlot(sch){
+  const tz=$("#tz").value, dur=Math.max(5,+$("#defDur").value||20);
+  const siblings=S.slots.filter(s=>s.scheduleKey===sch.key).sort(cmpSlot);
+  const tplSlot=siblings[siblings.length-1]||S.slots[0]||S.orphanSlots[0]||null;
+  let date, start;
+  const last=siblings[siblings.length-1];
+  const tomorrow=addDays(todayIn(tz),1);
+  if(last && last.date){ const n=addMinutes(last.endDate||last.date,last.end||last.start,0); date=n.date; start=n.time; if(date<todayIn(tz)){date=tomorrow;start="09:00";} }
+  else { date=tomorrow; start="09:00"; }
+  const e=addMinutes(date,start,dur);
+  const id=nextId("Slot");
+  let template=tplSlot?clone(tplSlot.template):clone(DEFAULT_SLOT);
+  template.id=id;
+  template.schedule={reference:"Schedule/"+sch.id};
+  let fullUrl;
+  if(tplSlot && tplSlot.fullUrl) fullUrl=tplSlot.fullUrl.replace(/[^/]+$/,id);
+  else if(sch.fullUrl) fullUrl=sch.fullUrl.replace(/Schedule\/[^/]+$/,"Slot/"+id);
+  else fullUrl=S.base+"Slot/"+id;
+  if(tplSlot && typeof tplSlot.template.comment==="string" && tplSlot.template.comment.endsWith(tplSlot.id)) template.comment=tplSlot.template.comment.slice(0,-tplSlot.id.length)+id;
+  else if(!tplSlot) template.comment=fullUrl;
+  S.slots.push({uid:++uidSeq,id,fullUrl,template,entryExtra:tplSlot?clone(tplSlot.entryExtra):{},scheduleKey:sch.key,date,start,endDate:e.date,end:e.time,isNew:true,
+    security:tplSlot?tplSlot.security:"PUBLIC", mode:tplSlot?tplSlot.mode:"AMB", specialty:tplSlot?tplSlot.specialty:"", specialtyOrig:tplSlot?tplSlot.specialtyOrig:null});
+  render(); toast(id+" ajouté");
+}
+
+$("#btnShift").addEventListener("click",()=>{
+  const n=parseInt($("#shiftDays").value,10); if(!n) return;
+  S.slots.forEach(s=>{ if(s.date){ s.date=addDays(s.date,n); s.endDate=addDays(s.endDate||s.date,n); } });
+  render(); toast(`Créneaux décalés de ${n>0?"+":""}${n} jour(s)`);
+});
+$("#btnRebase").addEventListener("click",()=>{
+  const dated=S.slots.filter(s=>s.date); if(!dated.length) return;
+  const min=dated.map(s=>s.date).sort()[0];
+  const target=addDays(todayIn($("#tz").value),1);
+  const [a,b]=[min,target].map(d=>Date.UTC(...d.split("-").map((x,i)=>i===1?x-1:+x)));
+  const n=Math.round((b-a)/86400000);
+  dated.forEach(s=>{ s.date=addDays(s.date,n); s.endDate=addDays(s.endDate||s.date,n); });
+  render(); toast("Premier créneau placé demain, écarts conservés");
+});
+$("#btnPurgePast").addEventListener("click",()=>{
+  const tz=$("#tz").value, before=S.slots.length;
+  S.slots=S.slots.filter(s=>!(s.date&&s.start&&epoch(s.date,s.start,tz)<Date.now()));
+  render(); toast((before-S.slots.length)+" créneau(x) passé(s) supprimé(s)");
+});
+$("#tz").addEventListener("change",refreshAll);
+$("#optSort").addEventListener("change",refreshExport);
+$("#optNewId").addEventListener("change",()=>{ newBundleId=null; refreshExport(); });
+
+/* ---------- Export ---------- */
+let newBundleId=null;
+function uuid(){ return (crypto.randomUUID?crypto.randomUUID():"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==="x"?r:(r&3|8)).toString(16);})); }
+
+function buildSlotResource(s,tz){
+  const r=clone(s.template);
+  const out={};
+  const startIso=toFhirInstant(s.date,s.start,tz), endIso=toFhirInstant(s.endDate||s.date,s.end,tz);
+  // Conserve l'ordre des clés du modèle
+  Object.keys(r).forEach(k=>{
+    if(k==="id") out.id=s.id;
+    else if(k==="start") out.start=startIso;
+    else if(k==="end") out.end=endIso;
+    else out[k]=r[k];
+  });
+  if(!("id" in out)) out.id=s.id;
+  if(!("resourceType" in out)) out.resourceType="Slot";
+  if(!("start" in out)) out.start=startIso;
+  if(!("end" in out)) out.end=endIso;
+  if(!("status" in out)) out.status="free";
+  // Type de créneau (TRE_R314) → meta.security
+  out.meta=out.meta||{};
+  const otherSec=(out.meta.security||[]).filter(x=>x.system!==SYS_R314);
+  const sec=s.security?s.security.split("+").map(code=>({system:SYS_R314,code})):[];
+  if(sec.length||otherSec.length) out.meta.security=[...sec,...otherSec]; else delete out.meta.security;
+  // Mode de consultation (ActCode) → serviceType, les autres entrées (motif en texte…) sont conservées
+  {
+    const others=(out.serviceType||[]).map(x=>{
+      const c=(x.coding||[]).filter(k=>k.system!==SYS_ACT);
+      if(!x.coding) return x;
+      if(!c.length) return x.text?{text:x.text}:null;
+      return {...x,coding:c};
+    }).filter(Boolean);
+    const modes=s.mode?s.mode.split("+").map(code=>({coding:[{system:SYS_ACT,code}]})):[];
+    const st=[...modes,...others];
+    if(st.length) out.serviceType=st; else delete out.serviceType;
+  }
+  // Spécialité (TRE_R38)
+  if(s.specialty==="__orig"){ /* valeur d'origine conservée */ }
+  else if(s.specialty){
+    const sp=[{coding:[{system:SYS_R38,code:s.specialty}]}];
+    if("specialty" in out) out.specialty=sp;
+    else { const o2={}; Object.keys(out).forEach(k=>{ o2[k]=out[k]; if(k==="serviceType") o2.specialty=sp; }); if(!("specialty" in o2)) o2.specialty=sp; return o2; }
+  } else delete out.specialty;
+  return out;
+}
+
+function withId(id,rt,r){ const o={id,resourceType:rt}; Object.keys(r).forEach(k=>{ if(k!=="id"&&k!=="resourceType") o[k]=r[k]; }); return o; }
+function buildPractitioner(p){
+  const r=p.orig?clone(p.orig):{id:p.id,resourceType:"Practitioner",meta:{profile:[PROF.pract]},identifier:[],name:[{}]};
+  r.identifier=r.identifier||[];
+  let idf=r.identifier.find(i=>i.system===OID_RPPS_IDNPS);
+  if(!idf){ idf={system:OID_RPPS_IDNPS,value:"",type:{coding:[{system:SYS_V2_0203,code:"IDNPS"}]}}; r.identifier.unshift(idf); }
+  idf.value=p.idnps;
+  r.name=r.name&&r.name.length?r.name:[{}];
+  const nm=r.name[0];
+  if(p.family!==p.init.family || !p.orig) nm.family=p.family;
+  if(p.given!==p.init.given || !p.orig){ const g=p.given.split(/\s+/).filter(Boolean); if(g.length) nm.given=g; else delete nm.given; }
+  return r;
+}
+function buildRole(role,p){
+  const chg=k=>!role.orig || role[k]!==role.init[k];
+  const r=role.orig?clone(role.orig):{id:role.id,resourceType:"PractitionerRole",meta:{profile:[PROF.role]},contained:[],practitioner:{},organization:{},location:[],telecom:[]};
+  r.practitioner={...(r.practitioner||{}),reference:"Practitioner/"+p.id};
+  if(role.locContained){
+    r.contained=r.contained||[];
+    let loc=r.contained.find(c=>c.id===role.locId);
+    if(!loc){ loc={id:role.locId,resourceType:"Location",meta:{profile:[PROF.loc]},identifier:[],address:{}}; r.contained.push(loc); }
+    if(chg("locIdent")){
+      loc.identifier=loc.identifier||[];
+      if(role.locIdent){ if(!loc.identifier[0]) loc.identifier[0]={system:"https://editeur.com",value:"",type:{coding:[{system:SYS_LOC_ID,code:"INTRN"}]}}; loc.identifier[0].value=role.locIdent; }
+      else loc.identifier.shift();
+      if(!loc.identifier.length) delete loc.identifier;
+    }
+    loc.address=loc.address||{};
+    if(chg("city")) loc.address.city=role.city;
+    if(chg("postalCode")) loc.address.postalCode=role.postalCode;
+    if(chg("line")) loc.address.line=role.line?[role.line]:[];
+    if(!(r.location||[]).some(l=>l.reference==="#"+role.locId)) r.location=[{reference:"#"+role.locId},...(r.location||[])];
+  }
+  if(chg("orgValue")){
+    if(role.orgValue){ r.organization=r.organization||{}; r.organization.identifier=r.organization.identifier||{system:OID_IDNST,value:"",type:{coding:[{system:SYS_V2_0203,code:"IDNST"}]}}; r.organization.identifier.value=role.orgValue; }
+    else delete r.organization;
+  }
+  if(chg("phone")){
+    const others=(r.telecom||[]).filter(t=>t.system!=="phone");
+    r.telecom=role.phone?[{system:"phone",value:role.phone.replace(/[\s.]/g,"")},...others]:others;
+    if(!r.telecom.length) delete r.telecom;
+  }
+  return r;
+}
+function buildSchedule(sch,p,role){
+  if(sch.orig) return clone(sch.orig);
+  const actor=[{reference:"Practitioner/"+p.id}]; if(role) actor.push({reference:"PractitionerRole/"+role.id});
+  return {id:sch.id,resourceType:"Schedule",meta:{profile:[PROF.sched]},actor};
+}
+
+function buildBundle(){
+  const tz=$("#tz").value;
+  const src=S.bundle;
+  const out={};
+  const slotList=[...S.slots];
+  if($("#optSort").checked) slotList.sort((a,b)=>epoch(a.date,a.start,tz)-epoch(b.date,b.start,tz));
+  const others=[];
+  S.practs.forEach(p=>{
+    if(!p.missing) others.push({fullUrl:p.fullUrl,resource:buildPractitioner(p),...p.extra});
+    p.roles.forEach(role=>{
+      others.push({fullUrl:role.fullUrl,resource:buildRole(role,p),...role.extra});
+      role.schedules.forEach(sch=>others.push({fullUrl:sch.fullUrl,resource:buildSchedule(sch,p,role),...sch.extra}));
+    });
+    p.directScheds.forEach(sch=>others.push({fullUrl:sch.fullUrl,resource:buildSchedule(sch,p,null),...sch.extra}));
+  });
+  S.unassignedScheds.forEach(sch=>others.push({fullUrl:sch.fullUrl,resource:clone(sch.orig),...sch.extra}));
+  S.others.forEach(e=>others.push(e));
+  const slotEntries=slotList.map(s=>({fullUrl:s.fullUrl, resource:buildSlotResource(s,tz), ...s.entryExtra}));
+  const orphanEntries=S.orphanSlots.map(s=>({fullUrl:s.fullUrl, resource:clone(s.template), ...s.entryExtra}));
+  const entries=[...clone(others), ...slotEntries, ...orphanEntries];
+  entries.forEach(e=>{ if(!e.fullUrl) delete e.fullUrl; });
+  if($("#optNewId").checked){ if(!newBundleId) newBundleId=uuid(); }
+  Object.keys(src).forEach(k=>{
+    if(k==="entry") out.entry=entries;
+    else if(k==="total") out.total=slotEntries.length+orphanEntries.length;
+    else if(k==="id") out.id=$("#optNewId").checked?newBundleId:src.id;
+    else out[k]=clone(src[k]);
+  });
+  if(!("total" in out)) out.total=slotEntries.length+orphanEntries.length;
+  if(!("entry" in out)) out.entry=entries;
+  return out;
+}
+
+function validate(){
+  const tz=$("#tz").value, res=[];
+  const bad=S.slots.filter(s=>slotIssues(s).some(i=>i[0]==="err"));
+  const past=S.slots.filter(s=>s.date&&s.start&&epoch(s.date,s.start,tz)<Date.now());
+  const overlap=S.slots.filter(s=>slotIssues(s).some(i=>i[1]==="chevauchement"));
+  const ids=[...S.slots,...S.orphanSlots].map(s=>s.id);
+  const dup=ids.filter((x,i)=>ids.indexOf(x)!==i);
+  res.push(bad.length?["err",`${bad.length} créneau(x) invalide(s) : date manquante ou fin avant le début`]:["ok","Dates de début et de fin cohérentes"]);
+  res.push(dup.length?["err","Identifiants de Slot en double : "+[...new Set(dup)].join(", ")]:["ok","Identifiants de Slot uniques"]);
+  res.push(past.length?["warn",`${past.length} créneau(x) dans le passé : le SAS ne les affichera pas`]:["ok","Aucun créneau passé"]);
+  if(overlap.length) res.push(["warn",`${overlap.length} créneau(x) se chevauchent sur un même agenda`]);
+  if(!S.slots.length) res.push(["warn","Le Bundle ne contiendra aucun créneau"]);
+  const realP=S.practs.filter(p=>!p.missing);
+  const pErr=realP.filter(p=>V.required(p.family)||V.idnps(p.idnps));
+  res.push(pErr.length?["err",`${pErr.length} professionnel(s) incomplet(s) : nom et RPPS obligatoires (${pErr.map(p=>p.family||p.id).join(", ")})`]:["ok","Professionnels identifiés (nom, RPPS)"]);
+  const rpps=realP.map(p=>p.idnps).filter(Boolean), dupR=rpps.filter((x,i)=>rpps.indexOf(x)!==i);
+  if(dupR.length) res.push(["warn","RPPS présent plusieurs fois : "+[...new Set(dupR)].join(", ")]);
+  const roles=S.practs.flatMap(p=>p.roles.map(r=>[p,r]));
+  const aErr=roles.filter(([p,r])=>(r.locContained||r.isNew)&&(V.required(r.line)||V.cp(r.postalCode)||V.required(r.city)));
+  res.push(aErr.length?["err",`${aErr.length} adresse(s) incomplète(s) : voie, code postal et ville obligatoires`]:["ok","Adresses complètes"]);
+  const oErr=roles.filter(([p,r])=>V.idnst(r.orgValue)||V.phone(r.phone));
+  if(oErr.length) res.push(["warn",`${oErr.length} adresse(s) sans identifiant de structure valide ou avec un téléphone mal formé`]);
+  const noSlot=roles.filter(([p,r])=>!S.slots.some(s=>r.schedules.some(x=>x.key===s.scheduleKey)));
+  if(noSlot.length) res.push(["warn",`${noSlot.length} adresse(s) sans créneau`]);
+  res.push(["ok",`Bundle.total = ${S.slots.length+S.orphanSlots.length} (nombre de Slot)`]);
+  return res;
+}
+
+let lastJson="";
+function refreshExport(){
+  const locs=S.practs.reduce((n,p)=>n+p.roles.length,0);
+  $("#stP").textContent=S.practs.filter(p=>!p.missing).length; $("#stL").textContent=locs; $("#stS").textContent=S.slots.length;
+  refreshSearchLinks();
+  const checks=validate();
+  const ul=$("#checks"); ul.textContent="";
+  checks.forEach(([k,t])=>ul.append(el("li",{class:k,text:t})));
+  const blocked=checks.some(c=>c[0]==="err");
+  lastJson=JSON.stringify(buildBundle(),null,2);
+  $("#preview").textContent=lastJson;
+  $("#btnCopy").disabled=blocked; $("#btnDownload").disabled=blocked;
+  $("#btnCopy").title=blocked?"Corrigez les erreurs signalées avant d'exporter":"";
+}
+
+$("#btnCopy").addEventListener("click",async()=>{
+  try{ await navigator.clipboard.writeText(lastJson); toast("JSON copié"); }
+  catch(_){
+    const ta=el("textarea",{style:"position:fixed;opacity:0"}); ta.value=lastJson; document.body.append(ta); ta.select();
+    let ok=false; try{ ok=document.execCommand("copy"); }catch(__){}
+    ta.remove(); toast(ok?"JSON copié":"Copie impossible : sélectionnez l'aperçu et copiez-le manuellement");
+  }
+});
+
+let downloads=null;
+(async()=>{
+  try{
+    if(window.claude&&window.claude.use){ downloads=await window.claude.use("downloads"); if(downloads) $("#btnDownload").classList.remove("hidden"); }
+    else { downloads="local"; $("#btnDownload").classList.remove("hidden"); }
+  }catch(_){}
+})();
+$("#btnDownload").addEventListener("click",async()=>{
+  if(!downloads) return;
+  const p=S.practs[0]; const name=(p&&p.family?p.family.toLowerCase().replace(/[^a-z0-9]+/g,"-")+"-":"");
+  const fname=`bundle-creneaux-${name}${todayIn($("#tz").value)}.json`;
+  if(downloads==="local"){
+    const url=URL.createObjectURL(new Blob([lastJson],{type:"application/fhir+json"}));
+    const a=el("a",{href:url,download:fname}); document.body.append(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000); toast("Fichier téléchargé"); return;
+  }
+  try{ await downloads.save({filename:`bundle-creneaux-${name}${todayIn($("#tz").value)}.json`, data:lastJson}); toast("Fichier enregistré"); }
+  catch(e){ if(e&&e.code==="declined") return; if(e&&(e.code==="unavailable"||e.code==="not_granted")){ $("#btnDownload").classList.add("hidden"); } toast("Téléchargement indisponible : utilisez « Copier le JSON »"); }
+});
+
+/* ---------- Import ---------- */
+function showImportMsg(kind,text){ const m=$("#importMsg"); m.textContent=""; if(text) m.append(el("div",{class:"msg "+kind,text})); }
+function load(text){
+  let json;
+  try{ json=JSON.parse(text); }
+  catch(e){ showImportMsg("err","JSON illisible : "+e.message); return; }
+  try{ S=parseBundle(json); }
+  catch(e){ showImportMsg("err",e.message); return; }
+  // Détection du fuseau d'après le premier créneau
+  const first=S.slots[0]; if(first && first.template){ const m=/([+-]\d{2}:\d{2}|Z)$/.exec(first.template.start||""); if(m && ["-04:00","-03:00"].includes(m[1])) $("#tz").value="America/Martinique"; else if(m && m[1]==="+04:00") $("#tz").value="Indian/Reunion"; else if(m && m[1]==="+03:00") $("#tz").value="Indian/Mayotte"; else $("#tz").value="Europe/Paris"; }
+  newBundleId=null;
+  showImportMsg("ok",`${S.practs.length} professionnel(s), ${S.slots.length} créneau(x) chargés.`);
+  $("#importPanel").classList.add("hidden");
+  $("#editor").classList.remove("hidden"); $("#exportPanel").classList.remove("hidden");
+  render();
+}
+$("#btnAddPract").addEventListener("click",addPract);
+$("#sasUrl").addEventListener("input",()=>S&&refreshSearchLinks());
+$("#btnEmpty").addEventListener("click",()=>{ $("#src").value=""; load(JSON.stringify(emptyBundle())); addPract(); });
+$("#btnParse").addEventListener("click",()=>load($("#src").value.trim()));
+$("#btnExample").addEventListener("click",()=>{ $("#src").value=JSON.stringify(EXAMPLE,null,2); load($("#src").value); });
+$("#fileIn").addEventListener("change",ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  const rd=new FileReader(); rd.onload=()=>{ $("#src").value=rd.result; load(rd.result); }; rd.onerror=()=>showImportMsg("err","Lecture du fichier impossible."); rd.readAsText(f);
+  ev.target.value="";
+});
+$("#btnReimport").addEventListener("click",()=>{
+  $("#importPanel").classList.remove("hidden"); $("#editor").classList.add("hidden"); $("#exportPanel").classList.add("hidden"); showImportMsg("","");
+  $("#src").focus();
+});
+
+/* ---------- Toast ---------- */
+let tt; function toast(t){ const e=$("#toast"); e.textContent=t; e.classList.add("show"); clearTimeout(tt); tt=setTimeout(()=>e.classList.remove("show"),1800); }
+})();
+</script>
+</body>
+</html>
