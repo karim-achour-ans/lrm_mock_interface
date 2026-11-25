@@ -142,6 +142,8 @@ label.btn.off{opacity:.5;pointer-events:none}
 .msg.warn{background:var(--warn-soft);color:var(--warn)}
 .msg.info{background:var(--accent-soft);color:var(--accent)}
 .msg .btn.linkish{margin-top:6px;display:inline-block;color:var(--accent);border-color:var(--accent);background:var(--panel)}
+.simfb{margin:6px 0 4px}
+.simfav{font-size:.88rem;color:var(--muted);margin:8px 0}
 .simsetup{font-size:.88rem;color:var(--muted);margin:6px 0}
 .simsetup summary{cursor:pointer;color:var(--accent)}
 .simsetup ol{padding-left:20px;margin:8px 0}
@@ -292,6 +294,14 @@ pre#preview{margin:0;background:var(--code);color:var(--code-ink);font-family:va
           </div>
         </div>
         <label class="opt"><input type="checkbox" id="simBeforeSearch" checked> Déposer le Bundle sur le simulateur avant chaque « Lancer une recherche »</label>
+        <div class="field simfb">
+          <label for="simFallback">Si le script Tampermonkey n'est pas actif</label>
+          <select id="simFallback">
+            <option value="favori">Ouvrir le simulateur, dépôt via le favori puis recherche</option>
+            <option value="search">Ouvrir directement la recherche, sans dépôt</option>
+          </select>
+        </div>
+        <p class="simfav">Favori à installer une fois, en le glissant dans la barre de favoris : <a class="btn bookmarklet" id="bookmarklet" title="Glissez-moi dans la barre de favoris">SAS → simulateur</a></p>
         <div class="row" style="margin:10px 0">
           <button class="btn primary" id="btnSimDeposit">Déposer sur le simulateur</button>
           <button class="btn" id="btnSimCheck">Vérifier le script</button>
@@ -306,7 +316,7 @@ pre#preview{margin:0;background:var(--code);color:var(--code-ink);font-family:va
             <li><a id="userscriptLink" href="sas-bundle-simulateur.user.js" target="_blank" rel="noopener">Installez le script</a> (version 1.2 ou plus), puis rechargez cette page.</li>
             <li>Cliquez sur « Vérifier le script ».</li>
           </ol>
-          <p>Sans le script, la recherche s'ouvre sans dépôt et un bouton « Ouvrir le simulateur avec le Bundle » apparaît. Le Bundle est alors copié dans le presse-papiers : collez-le dans « JSON Data », ou cliquez sur le favori <a class="btn bookmarklet" id="bookmarklet" title="Glissez-moi dans la barre de favoris">SAS → simulateur</a> (à glisser dans la barre de favoris) pour remplir et soumettre le formulaire.</p>
+          <p>Sans le script, le favori « SAS → simulateur » prend le relais (réglage ci-dessus). Le Bundle est alors copié dans le presse-papiers : collez-le dans « JSON Data », ou cliquez sur le favori « SAS → simulateur » pour remplir et soumettre le formulaire.</p>
         </details>
         <div id="simMsg"></div>
       </section>
@@ -608,10 +618,22 @@ function render(){
   refreshExport();
 }
 
+/* Le moteur de recherche SAS ne reconnaît pas certaines voies écrites en majuscules (ex. « Rue DE LA CHAUSSEE ») :
+   pour l'adresse passée à la recherche uniquement, les mots en majuscules sont remis en casse normale. */
+const PARTICLES=new Set(["de","du","des","la","le","les","d","l","et","en","sur","sous","aux","au","a","à"]);
+function normStreet(line){
+  return (line||"").split(/\s+/).map((w,i)=>{
+    if(!/[A-ZÀ-Ý]/.test(w) || w!==w.toUpperCase() || /^\d/.test(w)) return w;
+    return w.toLowerCase().replace(/(^|[-'’])([a-zà-ÿ]+)/g,(m,sep,word)=>{
+      if(PARTICLES.has(word) && (i>0 || sep)) return sep+word;
+      return sep+word.charAt(0).toUpperCase()+word.slice(1);
+    });
+  }).join(" ");
+}
 function searchUrl(role,p){
   const id=(p.idnps||"").trim();
   const text=id.length>1?id.slice(1):"";
-  const loc=[role.line,role.postalCode,role.city].map(x=>(x||"").trim()).filter(Boolean).join(" ");
+  const loc=[normStreet(role.line),role.postalCode,role.city].map(x=>(x||"").trim()).filter(Boolean).join(" ");
   if(!text||!loc) return null;
   const base=($("#sasUrl").value||"").trim();
   return base+(base.includes("?")?"&":"?")+"text="+encodeURIComponent(text)+"&loc="+encodeURIComponent(loc);
@@ -1189,8 +1211,8 @@ function simPreflight(){
   if(!($("#simEditor").value||"").trim()) return "Renseignez le nom de l'éditeur à utiliser sur le simulateur.";
   return null;
 }
-async function simJobUrl(){
-  const job={bundle:lastJson, editor:$("#simEditor").value.trim(), resource:$("#simResource").value, next:null};
+async function simJobUrl(next){
+  const job={bundle:lastJson, editor:$("#simEditor").value.trim(), resource:$("#simResource").value, next:next||null};
   return $("#simEnv").value+SIM_REG+"#sas-bundle=v1."+await b64urlDeflate(JSON.stringify(job));
 }
 /* Dépôt en arrière-plan : la page du simulateur est chargée dans un cadre invisible,
@@ -1251,16 +1273,30 @@ function reportDeposit(res,searching){
   }
   simMsg("err",withDot(res.msg||"Dépôt refusé par le simulateur")+(searching?" Recherche ouverte malgré tout.":""));
 }
+function waitPage(w,text){ if(w) try{ w.document.title="Dépôt du Bundle…"; w.document.body.innerHTML='<p style="font:16px/1.5 system-ui,sans-serif;margin:48px;color:#1f6f8b"></p>'; w.document.body.firstChild.textContent=text; }catch(_){} }
+function goTab(w,url){ if(w&&!w.closed){ try{ w.opener=null; }catch(_){} w.location.href=url; } else window.open(url,"_blank"); }
 async function searchWithDeposit(searchUrl){
   const err=simPreflight();
   if(err){ simMsg("warn",err+" Recherche ouverte sans dépôt."); window.open(searchUrl,"_blank"); return; }
-  if(simScriptMissing){ window.open(searchUrl,"_blank"); reportDeposit({noScript:true},true); return; }
+  const fallback=$("#simFallback").value;
+  if(simScriptMissing && fallback==="search"){ window.open(searchUrl,"_blank"); reportDeposit({noScript:true},true); return; }
   const w=window.open("","_blank");
-  if(w){ try{ w.document.title="Dépôt du Bundle…"; w.document.body.innerHTML='<p style="font:16px/1.5 system-ui,sans-serif;margin:48px;color:#1f6f8b">Dépôt du Bundle sur le simulateur, puis ouverture de la recherche SAS…</p>'; }catch(_){} }
-  simMsg("info","Dépôt du Bundle sur le simulateur…");
-  const res=await depositViaFrame();
+  waitPage(w,"Dépôt du Bundle sur le simulateur, puis ouverture de la recherche SAS…");
+  let res={noScript:true};
+  if(!simScriptMissing){ simMsg("info","Dépôt du Bundle sur le simulateur…"); res=await depositViaFrame(); }
+  if(res.noScript){
+    simScriptMissing=true;
+    if(fallback==="favori"){
+      const url=await simJobUrl(searchUrl);
+      try{ await navigator.clipboard.writeText(lastJson); }catch(_){}
+      goTab(w,url);
+      simMsg("info","Le simulateur s'est ouvert avec le Bundle. Dans cet onglet, cliquez sur votre favori « SAS → simulateur » : le Bundle est déposé, puis la recherche SAS s'ouvre automatiquement.");
+      return;
+    }
+    reportDeposit(res,true); goTab(w,searchUrl); return;
+  }
   reportDeposit(res,true);
-  if(w&&!w.closed){ try{ w.opener=null; }catch(_){} w.location.href=searchUrl; } else window.open(searchUrl,"_blank");
+  goTab(w,searchUrl);
 }
 async function depositOnly(){
   const err=simPreflight(); if(err){ simMsg("err",err); return; }
@@ -1273,12 +1309,14 @@ $("#btnSimDeposit").addEventListener("click",depositOnly);
 $("#btnSimCheck").addEventListener("click",checkScript);
 $("#simEditor").addEventListener("input",()=>lsSet("simEditor",$("#simEditor").value.trim()));
 $("#simResource").addEventListener("change",()=>lsSet("simResource",$("#simResource").value));
+$("#simFallback").addEventListener("change",()=>lsSet("simFallback",$("#simFallback").value));
 $("#simBeforeSearch").addEventListener("change",()=>lsSet("simBeforeSearch",$("#simBeforeSearch").checked?"1":"0"));
 $("#simEnv").addEventListener("change",()=>{ simScriptMissing=false; lsSet("simEnv",$("#simEnv").value); $("#simAdminLink").href=$("#simEnv").value+SIM_REG; });
 (function initSim(){
   const ed=lsGet("simEditor"); if(ed) $("#simEditor").value=ed;
   const rs=lsGet("simResource"); if(rs) $("#simResource").value=rs;
   if(lsGet("simBeforeSearch")==="0") $("#simBeforeSearch").checked=false;
+  const fb=lsGet("simFallback"); if(fb==="search"||fb==="favori") $("#simFallback").value=fb;
   const se=lsGet("simEnv"); if(se && [...$("#simEnv").options].some(o=>o.value===se)) $("#simEnv").value=se;
   $("#simAdminLink").href=$("#simEnv").value+SIM_REG;
   $("#bookmarklet").href="javascript:"+encodeURIComponent("(function(){"+AGENT_SRC+"\nsasBundleAgent(true);})();void 0");
