@@ -132,6 +132,19 @@ table.slots .sid{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
 .annprog{height:6px;background:var(--line);border-radius:3px;margin-top:10px;overflow:hidden}
 #annBar{height:100%;width:0;background:var(--accent)}
 label.btn.off{opacity:.5;pointer-events:none}
+.sim{border-top:1px solid var(--line);margin:14px 0;padding-top:14px}
+.sim h3{margin:0 0 10px;font-size:1rem}
+.simgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.simgrid .field:nth-child(2){grid-column:1 / -1;order:-1}
+.sim .field{display:flex;flex-direction:column;gap:4px;font-size:.86rem;color:var(--muted)}
+.sim select,.sim input[type=text]{border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--panel);width:100%}
+.sim a.btn{text-decoration:none;color:var(--accent)}
+.simsetup{font-size:.88rem;color:var(--muted);margin:6px 0}
+.simsetup summary{cursor:pointer;color:var(--accent)}
+.simsetup ol{padding-left:20px;margin:8px 0}
+.simsetup li{margin-bottom:6px}
+.simsetup a{color:var(--accent)}
+.simsetup a.bookmarklet{display:inline-block;padding:3px 10px;cursor:grab;color:var(--accent);border-color:var(--accent)}
 .addr-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex:none}
 a.btn.search{text-decoration:none;color:var(--accent);border-color:var(--accent);white-space:nowrap}
 a.btn.search:hover{background:var(--accent-soft)}
@@ -255,6 +268,42 @@ pre#preview{margin:0;background:var(--code);color:var(--code-ink);font-family:va
         <button class="btn primary" id="btnCopy">Copier le JSON</button>
         <button class="btn hidden" id="btnDownload">Télécharger le .json</button>
       </div>
+      <section class="sim" aria-labelledby="simTitle">
+        <h3 id="simTitle">FHIR Editor Simulator</h3>
+        <div class="simgrid">
+          <div class="field">
+            <label for="simEnv">Simulateur</label>
+            <select id="simEnv">
+              <option value="https://sas-fhir-editor-simulator-integ2.ans.kleegroup.ovh">Intégration 2</option>
+              <option value="https://sas-fhir-editor-simulator-integ.ans.kleegroup.ovh">Intégration</option>
+              <option value="https://sas-fhir-editor-simulator-preprod.ans.kleegroup.ovh">Préproduction</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="simEditor">Nom de l'éditeur</label>
+            <input type="text" id="simEditor" autocomplete="off" spellcheck="false" placeholder="ex. editeur-test">
+          </div>
+          <div class="field">
+            <label for="simResource">Ressource</label>
+            <select id="simResource"><option>Slot</option><option>Schedule</option></select>
+          </div>
+        </div>
+        <label class="opt"><input type="checkbox" id="simBeforeSearch" checked> Déposer le Bundle sur le simulateur avant chaque « Lancer une recherche »</label>
+        <div class="row" style="margin:10px 0">
+          <button class="btn primary" id="btnSimDeposit">Déposer sur le simulateur</button>
+          <a class="btn" id="simAdminLink" target="_blank" rel="noopener">Ouvrir le simulateur ↗</a>
+        </div>
+        <details class="simsetup">
+          <summary>Activer le dépôt automatique (installation unique)</summary>
+          <p>Le simulateur n'accepte que les envois faits depuis ses propres pages. Un petit script, exécuté sur la page du simulateur, remplit le formulaire, clique sur Submit puis ouvre la recherche SAS. Choisissez l'une des deux options :</p>
+          <ol>
+            <li><b>Automatique</b> : installez l'extension <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener">Tampermonkey</a>, puis <a id="userscriptLink" href="sas-bundle-simulateur.user.js" target="_blank" rel="noopener">installez le script</a>. Ensuite, un clic suffit.</li>
+            <li><b>Sans extension</b> : glissez ce bouton dans votre barre de favoris : <a class="btn bookmarklet" id="bookmarklet" title="Glissez-moi dans la barre de favoris">SAS → simulateur</a>. Après chaque clic sur « Lancer une recherche », cliquez sur ce favori depuis la page du simulateur qui s'ouvre.</li>
+          </ol>
+          <p>Sans aucune des deux, la page du simulateur s'ouvre et le Bundle est copié dans le presse-papiers : collez-le dans « JSON Data », saisissez le nom de l'éditeur et cliquez sur Submit.</p>
+        </details>
+        <div id="simMsg"></div>
+      </section>
       <pre id="preview" tabindex="0" aria-label="Aperçu du Bundle exporté"></pre>
     </div>
   </aside>
@@ -562,7 +611,10 @@ function searchUrl(role,p){
   return base+(base.includes("?")?"&":"?")+"text="+encodeURIComponent(text)+"&loc="+encodeURIComponent(loc);
 }
 function searchLink(role,p){
-  const a=el("a",{class:"btn search",target:"_blank",rel:"noopener"},"Lancer une recherche");
+  const a=el("a",{class:"btn search",target:"_blank",rel:"noopener",onclick:ev=>{
+    if(!a.href || !$("#simBeforeSearch").checked) return;
+    ev.preventDefault(); depositOnSimulator(a.href);
+  }},"Lancer une recherche");
   role._a=a; role._p=p; updateSearchLink(role);
   return a;
 }
@@ -1100,6 +1152,58 @@ function validate(){
 }
 
 let lastJson="";
+/* ---------- FHIR Editor Simulator ---------- */
+const AGENT_SRC="async function sasBundleAgent(manual){\n  var KEY=\"sasBundlePayload\", REG=\"/admin?routeName=admin_register_fhir_file_data\";\n  function banner(msg,kind){\n    var b=document.getElementById(\"sasbundle-banner\");\n    if(!b){ b=document.createElement(\"div\"); b.id=\"sasbundle-banner\"; b.setAttribute(\"role\",\"status\");\n      b.style.cssText=\"position:fixed;z-index:2147483647;top:14px;left:50%;transform:translateX(-50%);max-width:min(720px,92vw);padding:12px 18px;border-radius:8px;font:14px/1.45 system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.22)\";\n      document.body.appendChild(b); }\n    b.style.background=kind===\"err\"?\"#fce8e6\":kind===\"ok\"?\"#e4f3ea\":\"#e2eff3\";\n    b.style.color=kind===\"err\"?\"#b3261e\":kind===\"ok\"?\"#2f7a4d\":\"#1f6f8b\";\n    b.textContent=msg;\n  }\n  async function decode(s){\n    s=s.replace(/-/g,\"+\").replace(/_/g,\"/\"); while(s.length%4) s+=\"=\";\n    var bin=Uint8Array.from(atob(s),function(c){return c.charCodeAt(0);});\n    var txt=await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream(\"deflate-raw\"))).text();\n    return JSON.parse(txt);\n  }\n  var job=null, m=location.hash.match(/sas-bundle=v1\\.([A-Za-z0-9_-]+)/);\n  if(m){\n    history.replaceState(null,\"\",location.pathname+location.search);\n    try{ job=await decode(m[1]); }catch(e){ banner(\"Bundle illisible dans l'adresse : \"+e.message,\"err\"); return; }\n    sessionStorage.setItem(KEY,JSON.stringify(job));\n  } else {\n    var saved=sessionStorage.getItem(KEY); if(saved) job=JSON.parse(saved);\n  }\n  if(!job){ if(manual) banner(\"Aucun Bundle en attente : lancez le d\u00e9p\u00f4t depuis l'\u00e9diteur de cr\u00e9neaux SAS.\",\"err\"); return; }\n  var form=document.querySelector('form[name=\"fhir_data_form\"]');\n  if(!form){\n    if(location.search.indexOf(\"admin_register_fhir_file_data\")<0){ location.href=location.origin+REG; return; }\n    sessionStorage.removeItem(KEY); banner(\"Formulaire \u00ab Configure fhir static response \u00bb introuvable sur cette page.\",\"err\"); return;\n  }\n  sessionStorage.removeItem(KEY);\n  function set(name,v){ var e=form.querySelector('[name=\"'+name+'\"]'); if(e&&v!=null){ e.value=v; e.dispatchEvent(new Event(\"input\",{bubbles:true})); e.dispatchEvent(new Event(\"change\",{bubbles:true})); } return e; }\n  set(\"fhir_data_form[jsonData]\",job.bundle);\n  set(\"fhir_data_form[parameters][editorName]\",job.editor);\n  set(\"fhir_data_form[parameters][resource]\",job.resource||\"Slot\");\n  banner(\"D\u00e9p\u00f4t du Bundle pour l'\u00e9diteur \u00ab \"+job.editor+\" \u00bb\u2026\");\n  var fd=new FormData(form), btn=form.querySelector('[type=\"submit\"]');\n  if(btn&&btn.name&&!fd.has(btn.name)) fd.append(btn.name,\"\");\n  var r,html;\n  try{ r=await fetch(form.getAttribute(\"action\")||location.href,{method:\"POST\",body:fd,credentials:\"same-origin\"}); html=await r.text(); }\n  catch(e){ banner(\"\u00c9chec de l'envoi au simulateur : \"+e.message+\". Le formulaire est rempli : cliquez sur Submit.\",\"err\"); return; }\n  var doc=new DOMParser().parseFromString(html,\"text/html\");\n  var errs=[].slice.call(doc.querySelectorAll(\".invalid-feedback,.form-error-message,.alert-danger,.alert-error,.form-errors li\")).map(function(e){return e.textContent.trim();}).filter(Boolean);\n  if(!r.ok||errs.length){ banner(\"Le simulateur a refus\u00e9 le Bundle\"+(errs.length?\" : \"+errs.join(\" \u00b7 \").replace(/[.\\s]+$/,\"\"):\" (HTTP \"+r.status+\")\")+\". Le formulaire est rempli : corrigez puis cliquez sur Submit.\",\"err\"); return; }\n  var ok=[].slice.call(doc.querySelectorAll(\".alert-success,.flash-success\")).map(function(e){return e.textContent.trim();}).filter(Boolean).join(\" \u00b7 \");\n  if(job.next){ banner(\"Bundle d\u00e9pos\u00e9 pour \u00ab \"+job.editor+\" \u00bb\"+(ok?\" (\"+ok+\")\":\"\")+\". Ouverture de la recherche SAS\u2026\",\"ok\"); setTimeout(function(){ location.href=job.next; },900); }\n  else banner(\"Bundle d\u00e9pos\u00e9 pour l'\u00e9diteur \u00ab \"+job.editor+\" \u00bb\"+(ok?\" \u2014 \"+ok:\"\")+\".\",\"ok\");\n}\n";
+const SIM_REG="/admin?routeName=admin_register_fhir_file_data";
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(_){} }
+function simForEnv(url){
+  if(/integration2/.test(url)) return "https://sas-fhir-editor-simulator-integ2.ans.kleegroup.ovh";
+  if(/integration\./.test(url)) return "https://sas-fhir-editor-simulator-integ.ans.kleegroup.ovh";
+  if(/preproduction/.test(url)) return "https://sas-fhir-editor-simulator-preprod.ans.kleegroup.ovh";
+  return null;
+}
+function syncSimWithEnv(){
+  const sim=simForEnv($("#sasUrl").value||"");
+  if(sim){ $("#simEnv").value=sim; lsSet("simEnv",sim); }
+  $("#simAdminLink").href=$("#simEnv").value+SIM_REG;
+}
+function simMsg(kind,text){ const m=$("#simMsg"); m.textContent=""; if(text) m.append(el("div",{class:"msg "+kind,text})); }
+async function b64urlDeflate(str){
+  const buf=await new Response(new Blob([str]).stream().pipeThrough(new CompressionStream("deflate-raw"))).arrayBuffer();
+  const bytes=new Uint8Array(buf); let bin="";
+  for(let i=0;i<bytes.length;i+=0x8000) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));
+  return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+async function depositOnSimulator(nextUrl){
+  refreshExport();
+  if(validate().some(c=>c[0]==="err")){ simMsg("err","Corrigez les erreurs signalées avant de déposer le Bundle."); toast("Bundle invalide : dépôt annulé"); return; }
+  const editor=($("#simEditor").value||"").trim();
+  if(!editor){ simMsg("err","Renseignez le nom de l'éditeur à utiliser sur le simulateur."); $("#simEditor").focus(); $("#exportPanel").scrollIntoView({block:"nearest"}); toast("Nom de l'éditeur manquant"); return; }
+  const w=window.open("","_blank");
+  try{
+    const job={bundle:lastJson, editor, resource:$("#simResource").value, next:nextUrl||null};
+    const url=$("#simEnv").value+SIM_REG+"#sas-bundle=v1."+await b64urlDeflate(JSON.stringify(job));
+    try{ await navigator.clipboard.writeText(lastJson); }catch(_){}
+    if(w){ try{ w.opener=null; }catch(_){} w.location.href=url; } else window.open(url,"_blank");
+    const envName=$("#simEnv").selectedOptions[0].textContent;
+    simMsg("ok",`Simulateur ${envName} ouvert pour l'éditeur « ${editor} »${nextUrl?", la recherche SAS s'ouvrira après le dépôt":""}. Bundle également copié dans le presse-papiers.`);
+  }catch(e){ if(w) w.close(); simMsg("err","Préparation du dépôt impossible : "+e.message); }
+}
+$("#btnSimDeposit").addEventListener("click",()=>depositOnSimulator(null));
+$("#simEditor").addEventListener("input",()=>lsSet("simEditor",$("#simEditor").value.trim()));
+$("#simResource").addEventListener("change",()=>lsSet("simResource",$("#simResource").value));
+$("#simBeforeSearch").addEventListener("change",()=>lsSet("simBeforeSearch",$("#simBeforeSearch").checked?"1":"0"));
+$("#simEnv").addEventListener("change",()=>{ lsSet("simEnv",$("#simEnv").value); $("#simAdminLink").href=$("#simEnv").value+SIM_REG; });
+(function initSim(){
+  const ed=lsGet("simEditor"); if(ed) $("#simEditor").value=ed;
+  const rs=lsGet("simResource"); if(rs) $("#simResource").value=rs;
+  if(lsGet("simBeforeSearch")==="0") $("#simBeforeSearch").checked=false;
+  const se=lsGet("simEnv"); if(se && [...$("#simEnv").options].some(o=>o.value===se)) $("#simEnv").value=se;
+  $("#simAdminLink").href=$("#simEnv").value+SIM_REG;
+  $("#bookmarklet").href="javascript:"+encodeURIComponent("(function(){"+AGENT_SRC+"\nsasBundleAgent(true);})();void 0");
+  $("#bookmarklet").addEventListener("click",ev=>{ ev.preventDefault(); toast("Glissez ce bouton dans la barre de favoris"); });
+})();
 function refreshExport(){
   const locs=S.practs.reduce((n,p)=>n+p.roles.length,0);
   $("#stP").textContent=S.practs.filter(p=>!p.missing).length; $("#stL").textContent=locs; $("#stS").textContent=S.slots.length;
@@ -1167,6 +1271,7 @@ function applyEnv(){
   if(!custom) $("#sasUrl").value=v;
   else { let c=""; try{ c=localStorage.getItem("sasEnvCustom")||""; }catch(_){} if(c) $("#sasUrl").value=c; }
   try{ localStorage.setItem("sasEnv",v); }catch(_){}
+  if(typeof syncSimWithEnv==="function") syncSimWithEnv();
   if(S) refreshSearchLinks();
 }
 $("#sasEnv").addEventListener("change",applyEnv);
