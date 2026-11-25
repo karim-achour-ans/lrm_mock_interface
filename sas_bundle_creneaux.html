@@ -124,6 +124,14 @@ table.slots .sid{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
 .lk.ok{background:var(--ok-soft);color:var(--ok)}
 .lk.none{background:var(--warn-soft);color:var(--warn)}
 .lk.err{background:var(--err-soft);color:var(--err)}
+.annpanel{margin:-6px 0 18px;padding:12px 18px}
+.annhead{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+.annsum-title{font-weight:700}
+.annlink{color:var(--accent);font-size:.88rem}
+.annhint{color:var(--muted);font-size:.9rem;margin:8px 0 0;max-width:90ch}
+.annprog{height:6px;background:var(--line);border-radius:3px;margin-top:10px;overflow:hidden}
+#annBar{height:100%;width:0;background:var(--accent)}
+label.btn.off{opacity:.5;pointer-events:none}
 .addr-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex:none}
 a.btn.search{text-decoration:none;color:var(--accent);border-color:var(--accent);white-space:nowrap}
 a.btn.search:hover{background:var(--accent-soft)}
@@ -216,6 +224,16 @@ pre#preview{margin:0;background:var(--code);color:var(--code-ink);font-family:va
           <button class="btn" id="btnPurgePast">Supprimer les créneaux passés</button>
           <button class="btn ghost" id="btnReimport">Changer de ressource</button>
         </div>
+      </div>
+      <div class="panel annpanel">
+        <div class="annhead">
+          <span class="annsum-title">Extraction Annuaire santé</span>
+          <span class="lk" id="annState">non chargée</span>
+          <label class="btn file" id="annLoadBtn">Charger le fichier .txt<input type="file" id="annFile" accept=".txt,.csv,text/plain"></label>
+          <a class="annlink" href="https://www.data.gouv.fr/datasets/69025e6c73d1f9b79ca3c365" target="_blank" rel="noopener">Télécharger l'extraction sur data.gouv.fr ↗</a>
+        </div>
+        <div class="annprog hidden" id="annProg"><div id="annBar"></div></div>
+        <p class="annhint" id="annHint">Chargez le fichier <code>PS_LibreAcces_Personne_activite</code> (dézippé) : les adresses d'un professionnel seront remplies automatiquement à la saisie de son RPPS. Le fichier est lu dans votre navigateur, rien n'est envoyé.</p>
       </div>
       <div id="orphans"></div>
       <div id="practs"></div>
@@ -752,29 +770,16 @@ function removePract(p){
   S.practs=S.practs.filter(x=>x!==p);
   render(); toast("Professionnel supprimé");
 }
-/* ---------- Annuaire santé (data.gouv.fr, API tabulaire) ---------- */
-const ANNUAIRE_RID="fffda7e9-0ea2-4c35-bba0-4496f3af935d";
-const ANNUAIRE_API="https://tabular-api.data.gouv.fr/api/resources/"+ANNUAIRE_RID+"/data/";
-let annCols=null;
+/* ---------- Annuaire santé : extraction publique chargée en local ---------- */
+let ANN=null;
 const normTxt=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
 function pickCol(cols,...cands){
-  for(const c of cands){ const n=normTxt(c); const f=cols.find(x=>normTxt(x)===n); if(f) return f; }
-  for(const c of cands){ const n=normTxt(c); const f=cols.find(x=>{const m=normTxt(x); return m.length>8 && (n.startsWith(m)||m.startsWith(n));}); if(f) return f; }
+  for(const c of cands){ const n=normTxt(c); const i=cols.findIndex(x=>normTxt(x)===n); if(i>=0) return i; }
+  for(const c of cands){ const n=normTxt(c); const i=cols.findIndex(x=>{const m=normTxt(x); return m.length>8 && (n.startsWith(m)||m.startsWith(n));}); if(i>=0) return i; }
   return null;
 }
-async function getJson(url){
-  let r;
-  try{ r=await fetch(url,{headers:{Accept:"application/json"}}); }
-  catch(_){ throw new Error("Annuaire santé injoignable depuis cette page (réseau ou restriction du navigateur). Ouvrez l'éditeur en local ou depuis GitHub Pages."); }
-  if(!r.ok) throw new Error("L'API data.gouv.fr a répondu "+r.status+(r.status===404?" : le fichier n'est pas exposé par l'API tabulaire.":"."));
-  return r.json();
-}
-async function annuaireColumns(){
-  if(annCols) return annCols;
-  const j=await getJson(ANNUAIRE_API+"?page_size=1");
-  const row=(j.data||[])[0]; if(!row) throw new Error("Le fichier de l'Annuaire santé est vide.");
-  const cols=Object.keys(row);
-  annCols={
+function mapCols(cols){
+  return {
     idnat:pickCol(cols,"Identification nationale PP"), idpp:pickCol(cols,"Identifiant PP"),
     nom:pickCol(cols,"Nom d'exercice"), prenom:pickCol(cols,"Prénom d'exercice"),
     num:pickCol(cols,"Numéro Voie (coord. structure)"), indice:pickCol(cols,"Indice répétition voie (coord. structure)"),
@@ -785,20 +790,71 @@ async function annuaireColumns(){
     idStruct:pickCol(cols,"Identifiant technique de la structure"), raison:pickCol(cols,"Raison sociale site"),
     enseigne:pickCol(cols,"Enseigne commerciale site")
   };
-  if(!annCols.idnat && !annCols.idpp){ const c=annCols; annCols=null; throw new Error("Colonne d'identifiant PP introuvable dans le fichier ("+cols.slice(0,6).join(", ")+"…)."); }
-  return annCols;
 }
-async function annuaireRows(C,col,value){
-  const rows=[]; let url=ANNUAIRE_API+"?"+encodeURIComponent(col+"__exact")+"="+encodeURIComponent(value)+"&page_size=50";
-  for(let i=0;i<6 && url;i++){ const j=await getJson(url); rows.push(...(j.data||[])); url=j.links&&j.links.next||null; }
-  return rows;
+function annState(state,label){ const e=$("#annState"); e.className="lk "+state; e.textContent=label; }
+const SEP_REC="\u0001";
+async function loadExtraction(file){
+  annState("loading","lecture…"); $("#annProg").classList.remove("hidden"); $("#annBar").style.width="0%";
+  $("#annLoadBtn").classList.add("off");
+  try{
+    const head=new Uint8Array(await file.slice(0,65536).arrayBuffer());
+    let enc="utf-8"; try{ new TextDecoder("utf-8",{fatal:true}).decode(head.subarray(0,Math.max(0,head.length-4))); }catch(_){ enc="windows-1252"; }
+    let bytes=0;
+    const counter=new TransformStream({transform(chunk,ctl){ bytes+=chunk.byteLength; ctl.enqueue(chunk); }});
+    const reader=file.stream().pipeThrough(counter).pipeThrough(new TextDecoderStream(enc)).getReader();
+    let buf="", cols=null, C=null, sep="|", idx=new Map(), lastPaint=0;
+    const handle=line=>{
+      if(line.endsWith("\r")) line=line.slice(0,-1);
+      if(!line) return;
+      if(!cols){
+        line=line.replace(/^﻿/,"");
+        sep=["|",";","\t"].sort((a,b)=>line.split(b).length-line.split(a).length)[0];
+        cols=line.split(sep).map(c=>c.trim().replace(/^"|"$/g,""));
+        C=mapCols(cols);
+        if(C.idnat==null && C.idpp==null) throw new Error("Colonne « Identification nationale PP » introuvable : est-ce bien le fichier PS_LibreAcces_Personne_activite ?");
+        return;
+      }
+      const r=line.split(sep);
+      let id=C.idnat!=null?(r[C.idnat]||"").trim():"";
+      if(!id && C.idpp!=null && r[C.idpp]) id="8"+r[C.idpp].trim();
+      if(!id) return;
+      const a=rowToAddress(C,r);
+      const rec=[C.nom!=null?txt(r[C.nom]):"",C.prenom!=null?txt(r[C.prenom]):"",a.line,a.postalCode,a.city,a.phone,a.orgValue,a.siteName,a.key].join(SEP_REC);
+      const list=idx.get(id);
+      if(!list) idx.set(id,[rec]);
+      else if(!list.includes(rec)) list.push(rec);
+    };
+    for(;;){
+      const {done,value}=await reader.read();
+      if(done) break;
+      buf+=value;
+      let start=0, nl;
+      while((nl=buf.indexOf("\n",start))>=0){ handle(buf.slice(start,nl)); start=nl+1; }
+      buf=buf.slice(start);
+      const now=Date.now();
+      if(now-lastPaint>120){ lastPaint=now; const pct=Math.round(bytes/file.size*100); $("#annBar").style.width=pct+"%"; annState("loading","lecture "+pct+" %"); }
+    }
+    if(buf) handle(buf);
+    if(!cols) throw new Error("Fichier vide.");
+    ANN={cols,C,idx,file:file.name};
+    annState("ok",idx.size.toLocaleString("fr-FR")+" professionnels");
+    $("#annHint").textContent=`${file.name} chargé (${(file.size/1048576).toFixed(0)} Mo). Saisissez un RPPS sur un nouveau professionnel, ou utilisez « Rechercher dans l'Annuaire santé » sur une fiche existante. Le fichier est à recharger à chaque ouverture de la page.`;
+    toast("Extraction chargée");
+    S&&S.practs.forEach(p=>{ if(p.lookup&&p.lookup.state==="none") p.lookup=null; });
+  }catch(e){
+    ANN=null; annState("err","erreur");
+    $("#annHint").textContent=(e&&e.name==="RangeError")?"Mémoire insuffisante pour indexer ce fichier dans le navigateur.":(e.message||String(e));
+  }finally{
+    $("#annProg").classList.add("hidden"); $("#annLoadBtn").classList.remove("off");
+  }
 }
+$("#annFile").addEventListener("change",ev=>{ const f=ev.target.files[0]; ev.target.value=""; if(f) loadExtraction(f); });
 const INDICE={B:"bis",T:"ter",Q:"quater",C:"quinquies"};
 const txt=v=>v==null?"":String(v).trim();
 function digits(v,len){ let d=txt(v).replace(/\.0$/,"").replace(/\D/g,""); if(d && len && d.length<len) d=d.padStart(len,"0"); return d; }
 function toE164(v){ let d=digits(v); if(!d) return ""; if(d.length===9) d="0"+d; if(d.length===10&&d[0]==="0") return "+33"+d.slice(1); return d.startsWith("33")?"+"+d:d; }
 function rowToAddress(C,r){
-  const g=k=>C[k]?txt(r[C[k]]):"";
+  const g=k=>C[k]!=null?txt(r[C[k]]):"";
   const ind=g("indice"), indTxt=INDICE[ind.toUpperCase()]||ind.toLowerCase();
   const num=digits(g("num"))||g("num");
   const line=[num+(indTxt?(num?" ":"")+indTxt:""), g("typeVoie"), g("voie")].map(x=>x.trim()).filter(Boolean).join(" ");
@@ -813,32 +869,26 @@ const addrKey=a=>normTxt((a.line||"")+" "+(a.postalCode||""));
 async function lookupAnnuaire(p){
   const id=(p.idnps||"").trim();
   if(V.idnps(id)){ p.lookup={state:"err",msg:"Renseignez un RPPS valide (12 chiffres) avant la recherche."}; render(); return; }
-  p.lookup={state:"loading",msg:"Recherche dans l'Annuaire santé…"}; render();
-  try{
-    const C=await annuaireColumns();
-    let rows=C.idnat?await annuaireRows(C,C.idnat,id):[];
-    if(!rows.length && C.idpp) rows=await annuaireRows(C,C.idpp,id.slice(1));
-    if(!rows.length){ p.lookup={state:"none",msg:"Aucune activité trouvée pour "+id+" dans l'Annuaire santé."}; render(); return; }
-    const first=rows[0];
-    if(!p.family && C.nom) p.family=txt(first[C.nom]);
-    if(!p.given && C.prenom) p.given=txt(first[C.prenom]);
-    const seen=new Set(), found=[];
-    rows.map(r=>rowToAddress(C,r)).forEach(a=>{ if(!a.line&&!a.postalCode) return; const k=a.key+"|"+addrKey(a); if(seen.has(k)) return; seen.add(k); found.push(a); });
-    const existing=new Set(p.roles.map(addrKey));
-    let added=0;
-    found.forEach(a=>{
-      if(existing.has(addrKey(a))) return;
-      existing.add(addrKey(a));
-      let role=p.roles.find(r=>r.isNew && !r.line && !r.postalCode && !r.city && !S.slots.some(s=>r.schedules.some(x=>x.key===s.scheduleKey)));
-      if(!role){ addRole(p,true); role=p.roles[p.roles.length-1]; }
-      Object.assign(role,{line:a.line,postalCode:a.postalCode,city:a.city,phone:a.phone,orgValue:a.orgValue,siteName:a.siteName});
-      added++;
-    });
-    const noAddr=rows.length && !found.length;
-    p.lookup={state:"ok",msg: noAddr?"Professionnel trouvé, mais aucune adresse de structure renseignée dans l'Annuaire santé."
-      : added?`${added} lieu(x) d'activité ajouté(s) depuis l'Annuaire santé.`:"Les lieux d'activité de l'Annuaire santé sont déjà présents."};
-    render(); if(added) toast(added+" adresse(s) importée(s)");
-  }catch(e){ p.lookup={state:"err",msg:e.message}; render(); }
+  if(!ANN){ p.lookup={state:"none",msg:"Chargez l'extraction de l'Annuaire santé (encadré en haut de page) pour remplir les adresses automatiquement."}; render(); return; }
+  const recs=(ANN.idx.get(id)||[]).map(x=>{ const f=x.split(SEP_REC); return {nom:f[0],prenom:f[1],line:f[2],postalCode:f[3],city:f[4],phone:f[5],orgValue:f[6],siteName:f[7],key:f[8]}; });
+  if(!recs.length){ p.lookup={state:"none",msg:"RPPS "+id+" absent de l'extraction chargée."}; render(); return; }
+  if(!p.family) p.family=recs[0].nom;
+  if(!p.given) p.given=recs[0].prenom;
+  const seen=new Map();
+  recs.forEach(a=>{ if(!a.line&&!a.postalCode) return; const k=a.key+"|"+addrKey(a); if(!seen.has(k)) seen.set(k,a); else if(!seen.get(k).siteName&&a.siteName) seen.get(k).siteName=a.siteName; });
+  const existing=new Set(p.roles.map(addrKey));
+  let added=0;
+  seen.forEach(a=>{
+    if(existing.has(addrKey(a))) return;
+    existing.add(addrKey(a));
+    let role=p.roles.find(r=>r.isNew && !r.line && !r.postalCode && !r.city && !S.slots.some(s=>r.schedules.some(x=>x.key===s.scheduleKey)));
+    if(!role){ addRole(p,true); role=p.roles[p.roles.length-1]; }
+    Object.assign(role,{line:a.line,postalCode:a.postalCode,city:a.city,phone:a.phone,orgValue:a.orgValue,siteName:a.siteName});
+    added++;
+  });
+  p.lookup={state:"ok",msg: !seen.size?"Professionnel trouvé, mais aucune adresse de structure dans l'extraction."
+    : added?`${added} lieu(x) d'activité ajouté(s) depuis l'Annuaire santé.`:"Les lieux d'activité de l'Annuaire santé sont déjà présents."};
+  render(); if(added) toast(added+" adresse(s) importée(s)");
 }
 
 let expTimer; function scheduleExport(){ clearTimeout(expTimer); expTimer=setTimeout(refreshExport,150); }
