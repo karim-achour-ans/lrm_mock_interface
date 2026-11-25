@@ -1,9 +1,13 @@
 // ==UserScript==
 // @name         SAS – dépôt automatique du Bundle sur le FHIR Editor Simulator
 // @namespace    https://github.com/karim-achour-ans/lrm_mock_interface
-// @version      1.1
+// @version      1.2
 // @description  Remplit et soumet en arrière-plan le formulaire « Configure fhir static response » avec le Bundle préparé dans l'éditeur de créneaux SAS.
-// @match        https://sas-fhir-editor-simulator-*.ans.kleegroup.ovh/admin*
+// @match        https://sas-fhir-editor-simulator-integ.ans.kleegroup.ovh/*
+// @match        https://sas-fhir-editor-simulator-integ2.ans.kleegroup.ovh/*
+// @match        https://sas-fhir-editor-simulator-preprod.ans.kleegroup.ovh/*
+// @updateURL    https://karim-achour-ans.github.io/lrm_mock_interface/sas-bundle-simulateur.user.js
+// @downloadURL  https://karim-achour-ans.github.io/lrm_mock_interface/sas-bundle-simulateur.user.js
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -26,6 +30,12 @@ async function sasBundleAgent(manual){
     var bin=Uint8Array.from(atob(s),function(c){return c.charCodeAt(0);});
     var txt=await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
     return JSON.parse(txt);
+  }
+  if(location.hash==="#sas-bundle-ping"){
+    history.replaceState(null,"",location.pathname+location.search);
+    notify("pong",true,"1.2");
+    if(!framed) banner("Script SAS actif sur ce simulateur.","ok");
+    return;
   }
   var job=null, m=location.hash.match(/sas-bundle=v1\.([A-Za-z0-9_-]+)/);
   if(m){
@@ -56,7 +66,7 @@ async function sasBundleAgent(manual){
   var doc=new DOMParser().parseFromString(html,"text/html");
   var errs=[].slice.call(doc.querySelectorAll(".invalid-feedback,.form-error-message,.alert-danger,.alert-error,.form-errors li,form ul li")).map(function(e){return e.textContent.trim();}).filter(Boolean);
   if(!r.ok||errs.length){ var why=errs.length?errs.join(" · ").replace(/[.\s]+$/,""):"HTTP "+r.status; banner("Le simulateur a refusé le Bundle : "+why+". Le formulaire est rempli : corrigez puis cliquez sur Submit.","err"); notify("done",false,"Le simulateur a refusé le Bundle : "+why); return; }
-  var ok=[].slice.call(doc.querySelectorAll(".alert-success,.flash-success")).map(function(e){return e.textContent.trim();}).filter(Boolean).join(" · ");
+  var ok=[].slice.call(doc.querySelectorAll(".alert-success,.flash-success")).map(function(e){return e.textContent.trim().replace(/[.\s]+$/,"");}).filter(Boolean).join(" · ");
   notify("done",true,ok);
   if(job.next&&!framed){ banner("Bundle déposé pour « "+job.editor+" »"+(ok?" ("+ok+")":"")+". Ouverture de la recherche SAS…","ok"); setTimeout(function(){ location.href=job.next; },900); }
   else banner("Bundle déposé pour l'éditeur « "+job.editor+" »"+(ok?" — "+ok:"")+".","ok");
