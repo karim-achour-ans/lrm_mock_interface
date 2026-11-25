@@ -142,14 +142,9 @@ label.btn.off{opacity:.5;pointer-events:none}
 .msg.warn{background:var(--warn-soft);color:var(--warn)}
 .msg.info{background:var(--accent-soft);color:var(--accent)}
 .msg .btn.linkish{margin-top:6px;display:inline-block;color:var(--accent);border-color:var(--accent);background:var(--panel)}
-.simfb{margin:6px 0 4px}
-.simfav{font-size:.88rem;color:var(--muted);margin:8px 0}
-.simsetup{font-size:.88rem;color:var(--muted);margin:6px 0}
-.simsetup summary{cursor:pointer;color:var(--accent)}
-.simsetup ol{padding-left:20px;margin:8px 0}
-.simsetup li{margin-bottom:6px}
-.simsetup a{color:var(--accent)}
-.simsetup a.bookmarklet{display:inline-block;padding:3px 10px;cursor:grab;color:var(--accent);border-color:var(--accent)}
+.simsteps{font-size:.88rem;color:var(--muted);padding-left:20px;margin:8px 0}
+.simsteps li{margin-bottom:6px}
+a.btn.bookmarklet{display:inline-block;padding:3px 10px;cursor:grab;color:var(--accent);border-color:var(--accent);text-decoration:none}
 .addr-actions{display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex:none}
 a.btn.search{text-decoration:none;color:var(--accent);border-color:var(--accent);white-space:nowrap}
 a.btn.search:hover{background:var(--accent-soft)}
@@ -293,31 +288,16 @@ pre#preview{margin:0;background:var(--code);color:var(--code-ink);font-family:va
             <select id="simResource"><option>Slot</option><option>Schedule</option></select>
           </div>
         </div>
-        <label class="opt"><input type="checkbox" id="simBeforeSearch" checked> Déposer le Bundle sur le simulateur avant chaque « Lancer une recherche »</label>
-        <div class="field simfb">
-          <label for="simFallback">Si le script Tampermonkey n'est pas actif</label>
-          <select id="simFallback">
-            <option value="favori">Ouvrir le simulateur, dépôt via le favori puis recherche</option>
-            <option value="search">Ouvrir directement la recherche, sans dépôt</option>
-          </select>
-        </div>
-        <p class="simfav">Favori à installer une fois, en le glissant dans la barre de favoris : <a class="btn bookmarklet" id="bookmarklet" title="Glissez-moi dans la barre de favoris">SAS → simulateur</a></p>
+        <label class="opt"><input type="checkbox" id="simBeforeSearch" checked> Passer par le simulateur à chaque « Lancer une recherche »</label>
+        <ol class="simsteps">
+          <li>Une seule fois : glissez ce bouton dans votre barre de favoris : <a class="btn bookmarklet" id="bookmarklet" title="Glissez-moi dans la barre de favoris">SAS → simulateur</a></li>
+          <li>Cliquez sur « Lancer une recherche » : le simulateur s'ouvre avec le Bundle.</li>
+          <li>Cliquez sur le favori « SAS → simulateur » : le Bundle est déposé pour l'éditeur choisi, puis la recherche SAS s'ouvre.</li>
+        </ol>
         <div class="row" style="margin:10px 0">
-          <button class="btn primary" id="btnSimDeposit">Déposer sur le simulateur</button>
-          <button class="btn" id="btnSimCheck">Vérifier le script</button>
-          <a class="btn" id="simAdminLink" target="_blank" rel="noopener">Ouvrir le simulateur ↗</a>
+          <button class="btn" id="btnSimDeposit">Ouvrir le simulateur avec le Bundle</button>
+          <a class="btn" id="simAdminLink" target="_blank" rel="noopener">Simulateur vide ↗</a>
         </div>
-        <details class="simsetup">
-          <summary>Activer le dépôt automatique (installation unique)</summary>
-          <p>Le simulateur n'accepte que les envois faits depuis ses propres pages. Un petit script installé dans votre navigateur s'en charge : au clic sur « Lancer une recherche », le Bundle est déposé en arrière-plan, puis la recherche SAS s'ouvre.</p>
-          <ol>
-            <li>Installez l'extension <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener">Tampermonkey</a>.</li>
-            <li>Dans Chrome, ouvrez <code>chrome://extensions</code>, cliquez sur « Détails » sous Tampermonkey et activez « Autoriser les scripts utilisateur » (sur les anciennes versions de Chrome : activez le « Mode développeur » en haut à droite). Sans ce réglage, Tampermonkey n'exécute aucun script.</li>
-            <li><a id="userscriptLink" href="sas-bundle-simulateur.user.js" target="_blank" rel="noopener">Installez le script</a> (version 1.2 ou plus), puis rechargez cette page.</li>
-            <li>Cliquez sur « Vérifier le script ».</li>
-          </ol>
-          <p>Sans le script, le favori « SAS → simulateur » prend le relais (réglage ci-dessus). Le Bundle est alors copié dans le presse-papiers : collez-le dans « JSON Data », ou cliquez sur le favori « SAS → simulateur » pour remplir et soumettre le formulaire.</p>
-        </details>
         <div id="simMsg"></div>
       </section>
       <pre id="preview" tabindex="0" aria-label="Aperçu du Bundle exporté"></pre>
@@ -1181,7 +1161,7 @@ function validate(){
 
 let lastJson="";
 /* ---------- FHIR Editor Simulator ---------- */
-const AGENT_SRC="async function sasBundleAgent(manual){\n  var KEY=\"sasBundlePayload\", REG=\"/admin?routeName=admin_register_fhir_file_data\";\n  var framed=false; try{ framed=window.top!==window; }catch(_){ framed=true; }\n  function notify(stage,ok,msg){ if(framed&&window.parent) try{ window.parent.postMessage({type:\"sas-bundle\",stage:stage,ok:ok,msg:msg},\"*\"); }catch(_){} }\n  function banner(msg,kind){\n    var b=document.getElementById(\"sasbundle-banner\");\n    if(!b){ b=document.createElement(\"div\"); b.id=\"sasbundle-banner\"; b.setAttribute(\"role\",\"status\");\n      b.style.cssText=\"position:fixed;z-index:2147483647;top:14px;left:50%;transform:translateX(-50%);max-width:min(720px,92vw);padding:12px 18px;border-radius:8px;font:14px/1.45 system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.22)\";\n      document.body.appendChild(b); }\n    b.style.background=kind===\"err\"?\"#fce8e6\":kind===\"ok\"?\"#e4f3ea\":\"#e2eff3\";\n    b.style.color=kind===\"err\"?\"#b3261e\":kind===\"ok\"?\"#2f7a4d\":\"#1f6f8b\";\n    b.textContent=msg;\n  }\n  async function decode(s){\n    s=s.replace(/-/g,\"+\").replace(/_/g,\"/\"); while(s.length%4) s+=\"=\";\n    var bin=Uint8Array.from(atob(s),function(c){return c.charCodeAt(0);});\n    var txt=await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream(\"deflate-raw\"))).text();\n    return JSON.parse(txt);\n  }\n  if(location.hash===\"#sas-bundle-ping\"){\n    history.replaceState(null,\"\",location.pathname+location.search);\n    notify(\"pong\",true,\"1.2\");\n    if(!framed) banner(\"Script SAS actif sur ce simulateur.\",\"ok\");\n    return;\n  }\n  var job=null, m=location.hash.match(/sas-bundle=v1\\.([A-Za-z0-9_-]+)/);\n  if(m){\n    history.replaceState(null,\"\",location.pathname+location.search);\n    notify(\"ready\");\n    try{ job=await decode(m[1]); }catch(e){ banner(\"Bundle illisible dans l'adresse : \"+e.message,\"err\"); notify(\"done\",false,\"Bundle illisible : \"+e.message); return; }\n    sessionStorage.setItem(KEY,JSON.stringify(job));\n  } else {\n    var saved=sessionStorage.getItem(KEY); if(saved) job=JSON.parse(saved);\n  }\n  if(!job){ if(manual) banner(\"Aucun Bundle en attente : lancez le d\u00e9p\u00f4t depuis l'\u00e9diteur de cr\u00e9neaux SAS.\",\"err\"); return; }\n  var form=document.querySelector('form[name=\"fhir_data_form\"]');\n  if(!form){\n    if(location.search.indexOf(\"admin_register_fhir_file_data\")<0){ location.href=location.origin+REG; return; }\n    sessionStorage.removeItem(KEY); banner(\"Formulaire \u00ab Configure fhir static response \u00bb introuvable sur cette page.\",\"err\"); notify(\"done\",false,\"Formulaire du simulateur introuvable.\"); return;\n  }\n  sessionStorage.removeItem(KEY);\n  function set(name,v){ var e=form.querySelector('[name=\"'+name+'\"]'); if(e&&v!=null){ e.value=v; e.dispatchEvent(new Event(\"input\",{bubbles:true})); e.dispatchEvent(new Event(\"change\",{bubbles:true})); } return e; }\n  set(\"fhir_data_form[jsonData]\",job.bundle);\n  set(\"fhir_data_form[parameters][editorName]\",job.editor);\n  set(\"fhir_data_form[parameters][resource]\",job.resource||\"Slot\");\n  banner(\"D\u00e9p\u00f4t du Bundle pour l'\u00e9diteur \u00ab \"+job.editor+\" \u00bb\u2026\");\n  var fd=new FormData(form), btn=form.querySelector('[type=\"submit\"]');\n  if(btn&&btn.name&&!fd.has(btn.name)) fd.append(btn.name,\"\");\n  var r,html;\n  try{ r=await fetch(form.getAttribute(\"action\")||location.href,{method:\"POST\",body:fd,credentials:\"same-origin\"}); html=await r.text(); }\n  catch(e){ banner(\"\u00c9chec de l'envoi au simulateur : \"+e.message+\". Le formulaire est rempli : cliquez sur Submit.\",\"err\"); notify(\"done\",false,\"\u00c9chec de l'envoi : \"+e.message); return; }\n  var doc=new DOMParser().parseFromString(html,\"text/html\");\n  var errs=[].slice.call(doc.querySelectorAll(\".invalid-feedback,.form-error-message,.alert-danger,.alert-error,.form-errors li,form ul li\")).map(function(e){return e.textContent.trim();}).filter(Boolean);\n  if(!r.ok||errs.length){ var why=errs.length?errs.join(\" \u00b7 \").replace(/[.\\s]+$/,\"\"):\"HTTP \"+r.status; banner(\"Le simulateur a refus\u00e9 le Bundle : \"+why+\". Le formulaire est rempli : corrigez puis cliquez sur Submit.\",\"err\"); notify(\"done\",false,\"Le simulateur a refus\u00e9 le Bundle : \"+why); return; }\n  var ok=[].slice.call(doc.querySelectorAll(\".alert-success,.flash-success\")).map(function(e){return e.textContent.trim().replace(/[.\\s]+$/,\"\");}).filter(Boolean).join(\" \u00b7 \");\n  notify(\"done\",true,ok);\n  if(job.next&&!framed){ banner(\"Bundle d\u00e9pos\u00e9 pour \u00ab \"+job.editor+\" \u00bb\"+(ok?\" (\"+ok+\")\":\"\")+\". Ouverture de la recherche SAS\u2026\",\"ok\"); setTimeout(function(){ location.href=job.next; },900); }\n  else banner(\"Bundle d\u00e9pos\u00e9 pour l'\u00e9diteur \u00ab \"+job.editor+\" \u00bb\"+(ok?\" \u2014 \"+ok:\"\")+\".\",\"ok\");\n}\n";
+const AGENT_SRC="async function sasBundleAgent(manual){\n  var KEY=\"sasBundlePayload\", REG=\"/admin?routeName=admin_register_fhir_file_data\";\n  function banner(msg,kind){\n    var b=document.getElementById(\"sasbundle-banner\");\n    if(!b){ b=document.createElement(\"div\"); b.id=\"sasbundle-banner\"; b.setAttribute(\"role\",\"status\");\n      b.style.cssText=\"position:fixed;z-index:2147483647;top:14px;left:50%;transform:translateX(-50%);max-width:min(720px,92vw);padding:12px 18px;border-radius:8px;font:14px/1.45 system-ui,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.22)\";\n      document.body.appendChild(b); }\n    b.style.background=kind===\"err\"?\"#fce8e6\":kind===\"ok\"?\"#e4f3ea\":\"#e2eff3\";\n    b.style.color=kind===\"err\"?\"#b3261e\":kind===\"ok\"?\"#2f7a4d\":\"#1f6f8b\";\n    b.textContent=msg;\n  }\n  async function decode(s){\n    s=s.replace(/-/g,\"+\").replace(/_/g,\"/\"); while(s.length%4) s+=\"=\";\n    var bin=Uint8Array.from(atob(s),function(c){return c.charCodeAt(0);});\n    var txt=await new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream(\"deflate-raw\"))).text();\n    return JSON.parse(txt);\n  }\n  var job=null, m=location.hash.match(/sas-bundle=v1\\.([A-Za-z0-9_-]+)/);\n  if(m){\n    history.replaceState(null,\"\",location.pathname+location.search);\n    try{ job=await decode(m[1]); }catch(e){ banner(\"Bundle illisible dans l'adresse : \"+e.message,\"err\"); return; }\n    sessionStorage.setItem(KEY,JSON.stringify(job));\n  } else {\n    var saved=sessionStorage.getItem(KEY); if(saved) job=JSON.parse(saved);\n  }\n  if(!job){ if(manual) banner(\"Aucun Bundle en attente : lancez le d\u00e9p\u00f4t depuis l'\u00e9diteur de cr\u00e9neaux SAS.\",\"err\"); return; }\n  var form=document.querySelector('form[name=\"fhir_data_form\"]');\n  if(!form){\n    if(location.search.indexOf(\"admin_register_fhir_file_data\")<0){ location.href=location.origin+REG; return; }\n    sessionStorage.removeItem(KEY); banner(\"Formulaire \u00ab Configure fhir static response \u00bb introuvable sur cette page.\",\"err\"); return;\n  }\n  sessionStorage.removeItem(KEY);\n  function set(name,v){ var e=form.querySelector('[name=\"'+name+'\"]'); if(e&&v!=null){ e.value=v; e.dispatchEvent(new Event(\"input\",{bubbles:true})); e.dispatchEvent(new Event(\"change\",{bubbles:true})); } return e; }\n  set(\"fhir_data_form[jsonData]\",job.bundle);\n  set(\"fhir_data_form[parameters][editorName]\",job.editor);\n  set(\"fhir_data_form[parameters][resource]\",job.resource||\"Slot\");\n  banner(\"D\u00e9p\u00f4t du Bundle pour l'\u00e9diteur \u00ab \"+job.editor+\" \u00bb\u2026\");\n  var fd=new FormData(form), btn=form.querySelector('[type=\"submit\"]');\n  if(btn&&btn.name&&!fd.has(btn.name)) fd.append(btn.name,\"\");\n  var r,html;\n  try{ r=await fetch(form.getAttribute(\"action\")||location.href,{method:\"POST\",body:fd,credentials:\"same-origin\"}); html=await r.text(); }\n  catch(e){ banner(\"\u00c9chec de l'envoi au simulateur : \"+e.message+\". Le formulaire est rempli : cliquez sur Submit.\",\"err\"); return; }\n  var doc=new DOMParser().parseFromString(html,\"text/html\");\n  var errs=[].slice.call(doc.querySelectorAll(\".invalid-feedback,.form-error-message,.alert-danger,.alert-error,.form-errors li,form ul li\")).map(function(e){return e.textContent.trim();}).filter(Boolean);\n  if(!r.ok||errs.length){ var why=errs.length?errs.join(\" \u00b7 \").replace(/[.\\s]+$/,\"\"):\"HTTP \"+r.status; banner(\"Le simulateur a refus\u00e9 le Bundle : \"+why+\". Le formulaire est rempli : corrigez puis cliquez sur Submit.\",\"err\"); return; }\n  var ok=[].slice.call(doc.querySelectorAll(\".alert-success,.flash-success\")).map(function(e){return e.textContent.trim().replace(/[.\\s]+$/,\"\");}).filter(Boolean).join(\" \u00b7 \");\n  if(job.next){ banner(\"Bundle d\u00e9pos\u00e9 pour \u00ab \"+job.editor+\" \u00bb\"+(ok?\" (\"+ok+\")\":\"\")+\". Ouverture de la recherche SAS\u2026\",\"ok\"); setTimeout(function(){ location.href=job.next; },900); }\n  else banner(\"Bundle d\u00e9pos\u00e9 pour l'\u00e9diteur \u00ab \"+job.editor+\" \u00bb\"+(ok?\" \u2014 \"+ok:\"\")+\".\",\"ok\");\n}\n";
 const SIM_REG="/admin?routeName=admin_register_fhir_file_data";
 function lsGet(k){ try{ return localStorage.getItem(k); }catch(_){ return null; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(_){} }
@@ -1193,7 +1173,7 @@ function simForEnv(url){
 }
 function syncSimWithEnv(){
   const sim=simForEnv($("#sasUrl").value||"");
-  if(sim){ $("#simEnv").value=sim; lsSet("simEnv",sim); simScriptMissing=false; }
+  if(sim){ $("#simEnv").value=sim; lsSet("simEnv",sim); }
   $("#simAdminLink").href=$("#simEnv").value+SIM_REG;
 }
 function simMsg(kind,text){ const m=$("#simMsg"); m.textContent=""; if(text) m.append(el("div",{class:"msg "+kind,text})); }
@@ -1203,7 +1183,6 @@ async function b64urlDeflate(str){
   for(let i=0;i<bytes.length;i+=0x8000) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+0x8000));
   return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
-let simScriptMissing=false;
 function simMsg(kind,text,...extra){ const m=$("#simMsg"); m.textContent=""; if(text) m.append(el("div",{class:"msg "+kind},text,...extra)); }
 function simPreflight(){
   refreshExport();
@@ -1215,108 +1194,34 @@ async function simJobUrl(next){
   const job={bundle:lastJson, editor:$("#simEditor").value.trim(), resource:$("#simResource").value, next:next||null};
   return $("#simEnv").value+SIM_REG+"#sas-bundle=v1."+await b64urlDeflate(JSON.stringify(job));
 }
-/* Dépôt en arrière-plan : la page du simulateur est chargée dans un cadre invisible,
-   le script installé sur le simulateur remplit et soumet le formulaire puis répond par postMessage. */
-function depositViaFrame(){
-  return new Promise(async resolve=>{
-    const origin=new URL($("#simEnv").value).origin;
-    let url; try{ url=await simJobUrl(); }catch(e){ resolve({ok:false,msg:"Préparation du dépôt impossible : "+e.message}); return; }
-    const fr=el("iframe",{src:url,title:"Dépôt sur le simulateur","aria-hidden":"true",tabindex:"-1",style:"position:absolute;width:1px;height:1px;left:-9999px;top:0;border:0;opacity:0"});
-    let ready=false, done=false, t1, t2;
-    const on=ev=>{
-      if(ev.origin!==origin||!ev.data||ev.data.type!=="sas-bundle") return;
-      if(ev.data.stage==="ready"){ ready=true; clearTimeout(t1); }
-      else if(ev.data.stage==="done") finish({ok:!!ev.data.ok,msg:ev.data.msg||""});
-    };
-    const finish=res=>{ if(done) return; done=true; window.removeEventListener("message",on); clearTimeout(t1); clearTimeout(t2); setTimeout(()=>fr.remove(),300); resolve(res); };
-    window.addEventListener("message",on);
-    t1=setTimeout(()=>{ if(!ready) finish({ok:false,noScript:true}); },8000);
-    t2=setTimeout(()=>finish({ok:false,msg:"Le simulateur n'a pas répondu à temps."}),25000);
-    document.body.append(fr);
-  });
-}
-function pingScript(){
-  return new Promise(resolve=>{
-    const origin=new URL($("#simEnv").value).origin;
-    const fr=el("iframe",{src:$("#simEnv").value+SIM_REG+"#sas-bundle-ping",title:"Vérification du script","aria-hidden":"true",tabindex:"-1",style:"position:absolute;width:1px;height:1px;left:-9999px;top:0;border:0;opacity:0"});
-    let t;
-    const on=ev=>{ if(ev.origin===origin&&ev.data&&ev.data.type==="sas-bundle"&&ev.data.stage==="pong") end(true); };
-    const end=ok=>{ window.removeEventListener("message",on); clearTimeout(t); setTimeout(()=>fr.remove(),300); resolve(ok); };
-    window.addEventListener("message",on); t=setTimeout(()=>end(false),8000);
-    document.body.append(fr);
-  });
-}
-async function checkScript(){
-  const b=$("#btnSimCheck"); b.disabled=true; simMsg("info","Vérification du script sur le simulateur…");
-  const ok=await pingScript(); b.disabled=false;
-  const env=$("#simEnv").selectedOptions[0].textContent;
-  if(ok){ simScriptMissing=false; simMsg("ok",`Script actif : le dépôt automatique fonctionne sur le simulateur ${env}.`); }
-  else { simScriptMissing=true; simMsg("warn",`Le script ne répond pas sur le simulateur ${env}. Vérifiez les points de « Activer le dépôt automatique », puis rechargez cette page.`); $(".simsetup").open=true; }
-}
-function openSimulatorTab(){
+function openSimulatorTab(next){
   const w=window.open("","_blank");
-  simJobUrl().then(async url=>{
+  simJobUrl(next).then(async url=>{
     try{ await navigator.clipboard.writeText(lastJson); }catch(_){}
-    if(w){ try{ w.opener=null; }catch(_){} w.location.href=url; } else window.open(url,"_blank");
-  });
+    if(w&&!w.closed){ try{ w.opener=null; }catch(_){} w.location.href=url; } else window.open(url,"_blank");
+  }).catch(e=>{ if(w) w.close(); simMsg("err","Ouverture du simulateur impossible : "+e.message); });
 }
-const withDot=t=>{ t=(t||"").trim(); return t&&!/[.!?…]$/.test(t)?t+".":t; };
-function reportDeposit(res,searching){
-  const env=$("#simEnv").selectedOptions[0].textContent, ed=$("#simEditor").value.trim();
-  const after=searching?" La recherche SAS s'ouvre.":"";
-  if(res.ok){ simMsg("ok",`Bundle déposé sur le simulateur ${env} pour l'éditeur « ${ed} ».`+(res.msg?" "+withDot(res.msg):"")+after); toast("Bundle déposé"); return; }
-  if(res.noScript){
-    simScriptMissing=true;
-    simMsg("warn",`Dépôt non effectué : le script du simulateur n'a pas répondu (non installé, ou simulateur inaccessible depuis cette page). Voir « Activer le dépôt automatique ».${searching?" Recherche ouverte sans dépôt.":""} `,
-      el("button",{class:"btn linkish",onclick:openSimulatorTab},"Ouvrir le simulateur avec le Bundle"));
-    return;
-  }
-  simMsg("err",withDot(res.msg||"Dépôt refusé par le simulateur")+(searching?" Recherche ouverte malgré tout.":""));
-}
-function waitPage(w,text){ if(w) try{ w.document.title="Dépôt du Bundle…"; w.document.body.innerHTML='<p style="font:16px/1.5 system-ui,sans-serif;margin:48px;color:#1f6f8b"></p>'; w.document.body.firstChild.textContent=text; }catch(_){} }
-function goTab(w,url){ if(w&&!w.closed){ try{ w.opener=null; }catch(_){} w.location.href=url; } else window.open(url,"_blank"); }
-async function searchWithDeposit(searchUrl){
+function searchWithDeposit(searchUrl){
   const err=simPreflight();
-  if(err){ simMsg("warn",err+" Recherche ouverte sans dépôt."); window.open(searchUrl,"_blank"); return; }
-  const fallback=$("#simFallback").value;
-  if(simScriptMissing && fallback==="search"){ window.open(searchUrl,"_blank"); reportDeposit({noScript:true},true); return; }
-  const w=window.open("","_blank");
-  waitPage(w,"Dépôt du Bundle sur le simulateur, puis ouverture de la recherche SAS…");
-  let res={noScript:true};
-  if(!simScriptMissing){ simMsg("info","Dépôt du Bundle sur le simulateur…"); res=await depositViaFrame(); }
-  if(res.noScript){
-    simScriptMissing=true;
-    if(fallback==="favori"){
-      const url=await simJobUrl(searchUrl);
-      try{ await navigator.clipboard.writeText(lastJson); }catch(_){}
-      goTab(w,url);
-      simMsg("info","Le simulateur s'est ouvert avec le Bundle. Dans cet onglet, cliquez sur votre favori « SAS → simulateur » : le Bundle est déposé, puis la recherche SAS s'ouvre automatiquement.");
-      return;
-    }
-    reportDeposit(res,true); goTab(w,searchUrl); return;
-  }
-  reportDeposit(res,true);
-  goTab(w,searchUrl);
+  if(err){ simMsg("warn",err+" Recherche ouverte sans passer par le simulateur."); window.open(searchUrl,"_blank"); return; }
+  openSimulatorTab(searchUrl);
+  const env=$("#simEnv").selectedOptions[0].textContent;
+  simMsg("info",`Simulateur ${env} ouvert avec le Bundle (éditeur « ${$("#simEditor").value.trim()} »). Cliquez sur le favori « SAS → simulateur » dans cet onglet : le dépôt est fait, puis la recherche SAS s'ouvre.`);
 }
-async function depositOnly(){
+function depositOnly(){
   const err=simPreflight(); if(err){ simMsg("err",err); return; }
-  if(simScriptMissing){ reportDeposit({noScript:true},false); return; }
-  $("#btnSimDeposit").disabled=true; simMsg("info","Dépôt du Bundle sur le simulateur…");
-  const res=await depositViaFrame();
-  $("#btnSimDeposit").disabled=false; reportDeposit(res,false);
+  openSimulatorTab(null);
+  simMsg("info","Simulateur ouvert avec le Bundle. Cliquez sur le favori « SAS → simulateur » pour le déposer (le Bundle est aussi dans le presse-papiers).");
 }
 $("#btnSimDeposit").addEventListener("click",depositOnly);
-$("#btnSimCheck").addEventListener("click",checkScript);
 $("#simEditor").addEventListener("input",()=>lsSet("simEditor",$("#simEditor").value.trim()));
 $("#simResource").addEventListener("change",()=>lsSet("simResource",$("#simResource").value));
-$("#simFallback").addEventListener("change",()=>lsSet("simFallback",$("#simFallback").value));
 $("#simBeforeSearch").addEventListener("change",()=>lsSet("simBeforeSearch",$("#simBeforeSearch").checked?"1":"0"));
-$("#simEnv").addEventListener("change",()=>{ simScriptMissing=false; lsSet("simEnv",$("#simEnv").value); $("#simAdminLink").href=$("#simEnv").value+SIM_REG; });
+$("#simEnv").addEventListener("change",()=>{ lsSet("simEnv",$("#simEnv").value); $("#simAdminLink").href=$("#simEnv").value+SIM_REG; });
 (function initSim(){
   const ed=lsGet("simEditor"); if(ed) $("#simEditor").value=ed;
   const rs=lsGet("simResource"); if(rs) $("#simResource").value=rs;
   if(lsGet("simBeforeSearch")==="0") $("#simBeforeSearch").checked=false;
-  const fb=lsGet("simFallback"); if(fb==="search"||fb==="favori") $("#simFallback").value=fb;
   const se=lsGet("simEnv"); if(se && [...$("#simEnv").options].some(o=>o.value===se)) $("#simEnv").value=se;
   $("#simAdminLink").href=$("#simEnv").value+SIM_REG;
   $("#bookmarklet").href="javascript:"+encodeURIComponent("(function(){"+AGENT_SRC+"\nsasBundleAgent(true);})();void 0");
